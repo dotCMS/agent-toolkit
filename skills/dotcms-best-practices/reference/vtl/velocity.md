@@ -2,7 +2,7 @@
 
 The viewtools, context objects, and language gotchas a site build actually reaches for. The viewtool sections are curated from the dotCMS docs (dev.dotcms.com/docs/velocity-viewtools) — **not the full list**, just what a listing/detail/template build uses, with documented signatures and the traps that bite (full per-tool docs linked inline). §5 covers VTL-language behavior that isn't tied to any one tool.
 
-> These run in **VTL** (`.vtl` files, container/widget code, `#dotParse` partials, and `POST /api/vtl/dynamic`). They do **NOT** exist in the `execute` JS sandbox — see [05-verify-and-debug.md](05-verify-and-debug.md) (execute sandbox). When a `#dotParse` render comes back blank with HTTP 200, POST the VTL to `/api/vtl/dynamic` to get a real line/column error.
+> These run in **VTL** (`.vtl` files, container/widget code, `#dotParse` partials, and `POST /api/vtl/dynamic`). They do **NOT** exist in the JS code-execution sandbox — see [05-verify-and-debug.md](05-verify-and-debug.md). When a `#dotParse` render comes back blank with HTTP 200, POST the VTL to `/api/vtl/dynamic` to get a real line/column error.
 
 ## Contents
 
@@ -31,7 +31,7 @@ $dotcontent.pull("+contentType:Blog", -1, 0, "modDate desc")
 $dotcontent.pullPerPage("+contentType:Product +live:true", 2, 12, "title asc")
 
 ## find(idOrInode)  — one contentlet by identifier or inode
-$dotcontent.find("a7df3f39-a18a-4b16-b369-aa9d7acb0b27")
+$dotcontent.find("<identifier or inode>")
 
 ## count(query)  — integer count, for "N results" / paging math
 $dotcontent.count("+contentType:Product +live:true")
@@ -44,14 +44,14 @@ Query patterns: `+contentType:Product`, `+live:true`, `+conHost:${host.identifie
 - **Custom field terms must be TYPE-QUALIFIED** — `+Product.featured:true`, `+Product.slug:blue-shoe`, NOT `+featured:true` / `+slug:...`. An unqualified custom-field term matches nothing and returns **zero results with no error** (a silent empty listing). `contentType`, `live`, `title`, `modDate` and other system fields work unqualified; your own fields need the `<Var>.` prefix. Same rule in `POST /api/content/_search` `query` strings.
 
 - **Listings query; detail pages do NOT** — a detail page reads `$URLMapContent` (§2), it doesn't pull.
-- `pullRelated` for legacy relationships is **deprecated** — prefer a Lucene query against the relationship field instead.
+- `pullRelated` (legacy relationships) is superseded — prefer a Lucene query against the relationship field instead.
 - On a Widget content type, read the author-set field values with `$dotContentMap.<field>` and feed them into the query, rather than hardcoding the query.
 
 ---
 
 ## 2. Page / site / navigation context
 
-These are **context objects** dotCMS puts in scope — not tools you call to fetch. [05-verify-and-debug.md](05-verify-and-debug.md) (VTL traps): never reassign one; copy to a new var first (`#set($item = $URLMapContent)`).
+These are **context objects** dotCMS puts in scope — not something you call to fetch. [05-verify-and-debug.md](05-verify-and-debug.md) (VTL traps): never reassign one; copy to a new var first (`#set($item = $URLMapContent)`).
 
 - **`$URLMapContent`** — on a URL-mapped **detail page**, the single contentlet resolved from the URL. Guard it: `#if($UtilMethods.isSet($URLMapContent))`. Absent on non-detail pages.
 - **`$dotContentMap`** — the current contentlet's fields when rendering a **widget or container** (a widget reads its own author fields here). Not the same as `$URLMapContent`.
@@ -156,4 +156,4 @@ These are how VTL itself behaves against dotCMS data — the usual causes of a f
 
 ## What's intentionally left out
 
-The full viewtool list also has `$elasticsearch`, `$sql`, `$json`, `$xml`, `$dotcache`, `$mailer`, `$workflowtool`, `$categories`, `$persona`, `$sitesearch`, and more. They're real but out of scope for a standard content-driven site build — reach for the docs index (dev.dotcms.com/docs/velocity-viewtools) if the plan calls for search, external data, email, or personalization, and prefer a supported REST endpoint (look it up with the `search` tool) where one exists.
+The full viewtool list also has `$elasticsearch`, `$sql`, `$json`, `$xml`, `$dotcache`, `$mailer`, `$workflowtool`, `$categories`, `$persona`, `$sitesearch`, and more. They're real but out of scope for a standard content-driven site build — reach for the docs index (dev.dotcms.com/docs/velocity-viewtools) if the plan calls for search, external data, email, or personalization, and prefer a supported REST endpoint (look it up with the spec-search tool) where one exists.

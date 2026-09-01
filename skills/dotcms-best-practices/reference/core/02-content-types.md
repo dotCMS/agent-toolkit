@@ -2,10 +2,7 @@
 
 Creating the content types (data types + editable-section types) and their fields.
 
-There is no dedicated MCP tool for content types — go through `execute`, the same as sites
-([01](01-site.md)).
-
-The content-type create body, its `fields[]` array (field `clazz` values, `dataType` mapping, boolean-via-RadioField, Story Block, the `workflow` key, row/column layout), the `type=` base-type filter, and fetch-by-id are all documented in the OpenAPI spec — read them with the `search` tool (`spec.paths['/api/v1/contenttype']`, schema `ContentTypeRequestView`). This file keeps only what the spec can't express.
+The content-type create body, its `fields[]` array (field `clazz` values, `dataType` mapping, boolean-via-RadioField, Story Block, the `workflow` key, row/column layout), the `type=` base-type filter, and fetch-by-id are all documented in the OpenAPI spec — read them with the spec-search tool (`spec.paths['/api/v1/contenttype']`, schema `ContentTypeRequestView`). This file keeps only what the spec can't express.
 
 ## Every type needs a Site-or-Folder field and a workflow
 
@@ -28,30 +25,38 @@ the scheme you want; ids are not guaranteed to be the same across installs.
 { "workflow": ["<id from GET /api/v1/workflow/schemes>"] }
 ```
 
-## The variable is derived, and you must read it back
+## The `Var` is derived, and you must read it back
 
-**You do not choose the variable — dotCMS derives it from the name**, and the result may not
-match what you'd guess. Two things to know:
+Every content type has a **variable** — written `Var` throughout these files, and the token in
+`<Var>.vtl`. It is the single value every renderer matches on:
+
+| Mode | Where the `Var` is used |
+|---|---|
+| VTL | the `<Var>.vtl` filename in the container folder ([vtl/03](../vtl/03-containers.md)) |
+| Headless | the component-map key ([nextjs/01](../nextjs/01-component-contract.md)) |
+
+It is **not** the content type's `identifier` — that is a separate UUID, used for different calls.
+
+**You do not choose the `Var` — dotCMS derives it from the name**, and the result may not match
+what you'd guess. Two things to know:
 
 - **A name collision appends a number.** Create `Testimonial` when a `Testimonial` already
-  exists and the new type's variable becomes `testimonial1`. The create still succeeds.
+  exists and the new type's `Var` becomes `testimonial1`. The create still succeeds.
 - **Casing is not guaranteed to follow the name.**
 
-The variable is the key everything else matches on, case-exact — a container's `<Var>.vtl`
-filename ([vtl/03](../vtl/03-containers.md)) and a headless component-map key
-([nextjs/01](../nextjs/01-component-contract.md)). So **after creating a type, read the variable
-back off the response or fetch the type, and use that value.** Assuming it equals the name is
-the cause of a whole class of silent blank renders.
+So **after creating a type, read the `Var` back off the response or fetch the type, and use that
+value.** Matching case-exactly is mandatory; assuming the `Var` equals the name is the cause of a
+whole class of silent blank renders.
 
 ## Reserved variable names
 Variable names must match `[_A-Za-z][_0-9A-Za-z]*` (start with a letter or `_`, then only letters/digits/underscores — no spaces, no leading digit, no special characters). The words below are not allowed; matching is case-insensitive. If you need one, prefix it: `Host` → `AwazonHost`, field `type` → `productType`.
 
-**Not allowed as a content-type variable:** `host`, `conhost`, `conhostname`, `contenttype`, `basetype`, `structurename`, `structuretype`, `title`, `type`, `tags`, `categories`, `inode`, `shortinode`, `identifier`, `shortid`, `urlmap`, `path`, `parentpath`, `owner`, `ownercanpublish`, `ownercanread`, `ownercanwrite`, `moddate`, `moduser`, `pubdate`, `expdate`, `recurrencestart`, `recurrenceend`, `originalstartdate`, `live`, `working`, `deleted`, `locked`, `languageid`, `permissions`, `metadata`, `versionts`, `wfassign`, `wfcreatedby`, `wfcurrentstepname`, `wfmoddate`, `wfscheme`, `wfstep`. Plus, for brand-new types only: `folder`, `file`, `forms`, `htmlpage`, `menulink`, `container`, `template`, `user`, `calendarEvent`.
+**Not allowed as a content type's `Var`:** `host`, `conhost`, `conhostname`, `contenttype`, `basetype`, `structurename`, `structuretype`, `title`, `type`, `tags`, `categories`, `inode`, `shortinode`, `identifier`, `shortid`, `urlmap`, `path`, `parentpath`, `owner`, `ownercanpublish`, `ownercanread`, `ownercanwrite`, `moddate`, `moduser`, `pubdate`, `expdate`, `recurrencestart`, `recurrenceend`, `originalstartdate`, `live`, `working`, `deleted`, `locked`, `languageid`, `permissions`, `metadata`, `versionts`, `wfassign`, `wfcreatedby`, `wfcurrentstepname`, `wfmoddate`, `wfscheme`, `wfstep`. Plus, for brand-new types only: `folder`, `file`, `forms`, `htmlpage`, `menulink`, `container`, `template`, `user`, `calendarEvent`.
 
 **Not allowed as a field variable** (a different list): `languageid`, `locked`, `live`, `moddate`, `identifier`, `host`, `class`, `confolder`, `conhost`, `deleted`, `file`, `form`, `inode`, `moduser`, `owner`, `number`, `string`, `ownercanpublish`, `ownercanwrite`, `ownercanread`, `permissions`, `type`, `website`, `working`, `stinode`, `disabledwysiwyg`, `archived`, `basetype`, `contenttype`, `modusername`, `ownerusername`, `creationdate`, `publishuser`, `publishusername`. A field variable is also rejected if it collides with an inherited GraphQL field of an incompatible type.
 
 ## Adding fields
-Create the type with its fields inline as `fields[]` in the content-type POST — one call, and the spec documents the body (`ContentTypeRequestView`). To change fields on an existing type, use the **v3** fields endpoints under `/api/v3/contenttype/{typeIdOrVarName}/fields` (GET the layout, `PUT .../fields/move` to add/move a field, `PUT .../fields/{id}` to update one, DELETE to remove) — all in the spec; read them with `search`. The **v1** `/api/v1/contenttype/{typeId}/fields` endpoint is deprecated — don't use it (it had a trap where POSTing an array silently saved only the first field).
+Create the type with its fields inline as `fields[]` in the content-type POST — one call, and the spec documents the body (`ContentTypeRequestView`). To change fields on an existing type, use the **v3** fields endpoints under `/api/v3/contenttype/{typeIdOrVarName}/fields` — GET the layout, `PUT .../fields/move` to add or move a field, `PUT .../fields/{id}` to update one, DELETE to remove. All in the spec; read them with the spec-search tool.
 
 ## WIDGET types: `widgetCode` belongs to the TYPE
 Creating a `WIDGET` base type auto-adds `widgetTitle`, `widgetUsage`, `widgetPreexecute` and `widgetCode`. `widgetCode` is a **constant field**: its value lives on the field of the content type and is shared by every contentlet of that type — it is not a per-contentlet value, and a `widgetCode` key in a contentlet body does nothing.

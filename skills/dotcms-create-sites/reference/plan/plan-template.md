@@ -94,5 +94,11 @@
 
 ---
 
-## Handoff → Build (Phase 2 of this skill)
-Build from this **PLAN.md** (structure + tagged facts) + **`DESIGN.md`** (visual system: tokens + rationale), following the build references in the **`dotcms-best-practices`** skill (start at its `reference/README.md`, which routes you to `core/` plus either `vtl/` or a framework branch such as `nextjs/`, per §3b). **`[PLACEHOLDER]` renders as a visible TODO marker, never an invented value; `[n/a]` fields/sections are removed entirely, not flagged.** `[ai-draft]` copy needs human approval before launch. Verify every page type per your branch's verify step (`vtl/05` or `nextjs/05` in `dotcms-best-practices`) before done.
+## Handoff → Build
+
+Build from this **PLAN.md** (structure + tagged facts) and **`DESIGN.md`** (visual system). The
+build sequence and every reference for it live in the `dotcms-best-practices` skill — that
+skill's own index routes each step, per §3b's delivery mode. **`[PLACEHOLDER]` renders as a
+visible TODO marker, never an invented value; `[n/a]` fields and sections are removed entirely,
+not flagged.** `[ai-draft]` copy needs human approval before launch. Verification is a loop, not
+a checkbox: fix and re-verify until every page type passes.

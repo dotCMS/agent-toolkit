@@ -6,8 +6,8 @@ the template payload carries `siteId`, and pages are created under it. Create it
 before anything else.
 
 You need a hostname before starting — from PLAN.md §2 if you came from
-`dotcms-create-sites`, otherwise ask for it; never invent one. There is no dedicated MCP
-tool for sites — go through `execute`.
+`dotcms-create-sites`, otherwise ask for it; never invent one. Sites have no purpose-built tool —
+go through the dotCMS MCP server.
 
 ## Create (or reuse) the site
 

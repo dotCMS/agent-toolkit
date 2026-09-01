@@ -1,4 +1,4 @@
-# 01 · The contract: content type variable = component key
+# 01 · The contract: the type's `Var` = the component-map key
 
 The headless counterpart to VTL's "choose the mechanism" step
 ([vtl/01](../vtl/01-choose-mechanism.md)). In VTL you pick *where the markup lives* —
@@ -11,16 +11,16 @@ rendering as "no component":
 
 ```ts
 export const pageComponents = {
-  Book: BookCard,        // key === the content type's Velocity variable in dotCMS
+  Book: BookCard,        // key === the content type's Var in dotCMS
   webPageContent: WebPageContent,
 };
 ```
 
-## The key must equal the type's variable, case-exact
+## The key must equal the type's `Var`, case-exact
 
-And **you cannot assume the variable equals the type's name.** dotCMS derives it, a name
+And **you cannot assume the `Var` equals the type's name.** dotCMS derives it, a name
 collision appends a number — a second `Testimonial` becomes `testimonial1` — and casing does
-not reliably follow the name. **Read the variable back from dotCMS and use that value**
+not reliably follow the name. **Read the `Var` back from dotCMS and use that value**
 ([core/02](../core/02-content-types.md)). A key that differs by one character renders nothing.
 
 Create and name the content type *before* writing its component, so the variable exists to

@@ -31,7 +31,7 @@ produces HTML**, which strips two things out of the scaffold:
 | **Template layout** | required | **required** — the SDK reads `layout.body.rows` |
 | **Container folder** | required | **required** — it's the slot content is placed into |
 | **`container.vtl` / `preloop` / `postloop`** | required | **required**, same as VTL ([core/06](../core/06-containers.md)) |
-| **Per-type `<Var>.vtl`** | the actual markup | **a comment, no markup** — the filename registers the type so the page editor and UVE offer it to an author; React does the rendering |
+| **Per-type `<Var>.vtl`** | the actual markup | **a comment-only registration stub** — the filename registers the type so the page editor and UVE offer it to an author; React does the rendering |
 
 Everything else in `vtl/` is VTL-rendering mechanics and does not apply.
 
@@ -49,7 +49,7 @@ follows is hard to see.
 | **Config** | the env values, read once and exported |
 | **Client** | a single `createDotCMSClient` instance |
 | **Catch-all route** | maps a URL to a dotCMS page and renders it |
-| **Component map** | content-type variable → React component, plus a fallback for unmapped types |
+| **Component map** | the type's `Var` → React component, plus a fallback for unmapped types |
 | **`next.config`** | four dotCMS-specific settings — see [02](02-next-config.md) |
 
 **How to tell what's already there:**
@@ -64,7 +64,7 @@ follows is hard to see.
 | a catch-all route such as `app/[[...slug]]` | routing exists |
 
 Fill only the gaps. In a working app the usual job is **adding to the component map**: write
-the component and register it under the content type's Velocity variable, case-exact —
+the component and register it under the content type's `Var`, case-exact —
 [01](01-component-contract.md).
 
 ### 1. Configure

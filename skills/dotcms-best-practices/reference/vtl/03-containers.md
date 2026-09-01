@@ -6,8 +6,9 @@ covers only what VTL adds on top.
 
 ## `<Var>.vtl` — one file per content type
 
-- **Filename = the content type's Velocity variable, case-exact.** `Book.vtl` renders
-  a `Book`; `book.vtl` renders nothing, silently.
+- **Filename = the content type's `Var`, case-exact** — read it back from dotCMS, never assume
+  it matches the type's name ([core/02](../core/02-content-types.md)). `Book.vtl` renders a
+  `Book`; `book.vtl` renders nothing, silently.
 - Each file renders **one** contentlet, read via `$dotContentMap`. The container loops;
   your file is the body of that loop.
 - Put per-type markup here, never in `preloop`/`postloop` — those wrap the whole slot.

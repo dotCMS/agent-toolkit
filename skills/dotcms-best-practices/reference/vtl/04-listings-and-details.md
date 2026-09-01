@@ -1,37 +1,32 @@
 # 04 · Listings & detail pages
 
-The two recipes almost every dotCMS site needs: a **listing** (many items on one page) and a **detail page** (one item, keyed off the URL). This doc is the *sequence*; the sibling build files are the *gotcha reference* for each mechanic it touches. VTL syntax for the viewtools used below is in [velocity.md](velocity.md).
+The two recipes almost every site needs: a **listing** (many items on one page) and a **detail
+page** (one item, keyed off the URL). This file is the *sequence*; siblings hold the gotchas for
+each mechanic. VTL syntax: [velocity.md](velocity.md).
 
 ## Contents
 
-- [Decide the mechanism first](#decide-the-mechanism-first--see-01-choose-mechanismmd)
+- [Decide the mechanism first](#decide-the-mechanism-first)
 - [Recipe A — Listing page](#recipe-a--listing-page)
 - [Recipe B — Detail page (URL-mapped)](#recipe-b--detail-page-url-mapped-urlmapcontent)
-- [The two most common "renders blank, HTTP 200" causes](#the-two-most-common-renders-blank-http-200-causes-here)
 
-## Decide the mechanism first — see [01-choose-mechanism.md](01-choose-mechanism.md)
+## Decide the mechanism first
 
-| Need | Build |
-|------|-------|
-| A repeating data thing (Product, Book, Event) | **Content type** |
-| List of those items, no author controls | **SimpleWidget** — a VTL that `$dotcontent.pull`s the list |
-| List with author options (count, category, sort) | **Widget content type** with fields, VTL reads `$dotContentMap` |
-| One item rendered from its own URL (`/products/blue-shoe`) | **Detail page** — SimpleWidget reading `$URLMapContent`, wired via `urlMapPattern` + `detailPage` on the content type |
-
-Rule of thumb: **queries content → widget; renders a single passed-in item → detail-page VTL.**
+Do this in [01-choose-mechanism.md](01-choose-mechanism.md) before writing anything — the short
+version is **queries content → widget; renders a single passed-in item → detail-page VTL.**
 
 ---
 
 ## Recipe A — Listing page
 
-Goal: a page (e.g. `/products`) that renders all (or the newest N) items of a content type.
+A page such as `/products` rendering all (or the newest N) items of a content type.
 
-Two content types are involved and it's easy to conflate them: the **data type** you are
-listing (`Product`), and the **widget type** whose `widgetCode` runs the listing VTL.
+**Two content types are involved** and are easy to conflate: the **data type** being listed
+(`Product`), and the **widget type** whose `widgetCode` runs the listing VTL.
 
-1. **The data content type exists** with the fields you list ([02-content-types.md](../core/02-content-types.md) — check variable names against the reserved list, send all fields inline). Note its Velocity **variable** (case-exact) — you'll query by it.
+1. **The data content type exists** with the fields you list ([02-content-types.md](../core/02-content-types.md) — check variable names against the reserved list, send all fields inline). Note its **`Var`** (case-exact) — you'll query by it.
 
-2. **Write the listing VTL.** A SimpleWidget's code, or a standalone VTL you `#dotParse`. Pull, loop, render a card per item. Query by the content type variable:
+2. **Write the listing VTL.** A SimpleWidget's code, or a standalone VTL you `#dotParse`. Pull, loop, render a card per item. Query by the type's `Var`:
 
    ```velocity
    #set($items = $dotcontent.pull("+contentType:Product +live:true +conHost:${host.identifier}", 12, "modDate desc"))
@@ -57,7 +52,7 @@ listing (`Product`), and the **widget type** whose `widgetCode` runs the listing
    - Image URL is `/dA/${item.identifier}/<fieldVar>/<width>w/<quality>q/webp` — the `w`/`q` suffixes are required, and never `${item.image}` ([velocity.md](velocity.md) §4).
    - Detail link uses the same slug the urlmap uses (see Recipe B) so listing→detail is consistent.
 
-3. **Upload the VTL** with `upload_assets` (never inline bytes). Put it under `/application/...`, not `/assets` (reserved — [03-content.md](../core/03-content.md) assets).
+3. **Upload the VTL** with the asset-upload tool (never inline bytes). Put it under `/application/...`, not `/assets` (reserved — [03-content.md](../core/03-content.md) assets).
 
 4. **Create the WIDGET content type** — a different type from step 1. Use the built-in
    SimpleWidget for a fixed list, or your own Widget type with fields if the author picks
@@ -76,7 +71,7 @@ listing (`Product`), and the **widget type** whose `widgetCode` runs the listing
    [09-placement.md](../core/09-placement.md)), not extra steps: do it with the rest of
    the site's content. **Re-publish the page** after placing; LIVE won't change until you do.
 
-6. **Verify** with `page_verify` ([05-verify-and-debug.md](05-verify-and-debug.md)): a `verdict` of `empty-vtl-error` means the listing VTL failed — run it through `/api/vtl/dynamic` for a real stack trace.
+6. **Verify** ([05-verify-and-debug.md](05-verify-and-debug.md)): a `verdict` of `empty-vtl-error` means the listing VTL failed — run it through `/api/vtl/dynamic` for a real stack trace.
 
 ---
 
@@ -109,7 +104,7 @@ exist, so the page is created *before* the URL-map is set — not after.
    #end
    ```
 
-3. **Create the detail page** (`page_create`) at a stable URL — often a placeholder like
+3. **Create the detail page** at a stable URL — often a placeholder like
    `/products/detail`. Users never visit it directly; `urlMapPattern` is what they hit,
    and this page is the renderer. **Note its identifier** — step 4 needs it.
 
@@ -132,11 +127,6 @@ exist, so the page is created *before* the URL-map is set — not after.
 
 6. **Link listing → detail.** The listing card's `href` must match `urlMapPattern` with the item's slug value substituted: pattern `/products/{urlTitle}` → `href="/products/${item.urlTitle}"`.
 
-7. **Verify** a real slug with `page_verify` (path `/products/<slug>`) — its `urlMap` reports whether `$URLMapContent` resolved. Confirm a real slug renders (title/price present) and that an unknown slug hits your `#else` branch, not a blank 200. Details: [05-verify-and-debug.md](05-verify-and-debug.md).
+7. **Verify** a real slug (path `/products/<slug>`) — its `urlMap` reports whether `$URLMapContent` resolved. Confirm a real slug renders (title/price present) and that an unknown slug hits your `#else` branch, not a blank 200. Details: [05-verify-and-debug.md](05-verify-and-debug.md).
 
 ---
-
-## The two most common "renders blank, HTTP 200" causes here
-
-1. **Widget vs. content mixup** — a widget's code lives in `widgetCode`; if you put list logic in a container `<Var>.vtl` and place a widget, nothing runs. Match the mechanism to where the VTL lives.
-2. **Reading the wrong variable** — detail VTL must read `$URLMapContent`; a widget reads its own fields via `$dotContentMap`; a listing queries via `$dotcontent`. Using the wrong one silently yields empty output. When a render is blank, POST the exact VTL to `/api/vtl/dynamic` — it throws with line/column instead of swallowing the error the way `#dotParse` does.

@@ -2,7 +2,7 @@
 
 **Both delivery modes need this.** A container is the slot content is placed into.
 The template ([05](05-templates.md)) arranges containers into rows and columns;
-`page_place_content` ([09](09-placement.md)) addresses the slot it creates. Without
+Content placement ([09](09-placement.md)) addresses the slot it creates. Without
 a container there is nowhere to put content, in either mode.
 
 What differs is only what renders the slot: VTL runs a per-type `<Var>.vtl`
@@ -12,14 +12,14 @@ component ([nextjs/01](../nextjs/01-component-contract.md)).
 ## Create it as a Container-as-File
 
 A container is a **folder** under `/application/containers/<name>/`, uploaded with
-`upload_assets`. The folder is the container; there is no create endpoint to call.
+the asset-upload capability. The folder is the container; there is no create endpoint to call.
 
 | File | Required | What it's for |
 |---|---|---|
 | `container.vtl` | yes | metadata only — `$dotJSON.put` |
 | `preloop.vtl` | yes | markup before the loop |
 | `postloop.vtl` | yes | markup after the loop |
-| `<Var>.vtl` | yes — one per accepted type | VTL: renders one contentlet of that type. Headless: an empty registration stub (see below) |
+| `<Var>.vtl` | yes — one per accepted type | VTL: renders one contentlet of that type. Headless: a comment-only registration stub (see below) |
 
 `container.vtl` holds metadata, not markup:
 
@@ -36,8 +36,8 @@ slot, and content over the cap is silently dropped.
 **`preloop.vtl` and `postloop.vtl` must be non-empty** even when there is nothing to
 wrap — an empty postloop breaks container assembly. A comment line is enough.
 
-A headless build still creates all three of these. Its `<Var>.vtl` files can be stubs
-— see below.
+A headless build still creates all three of these. Its `<Var>.vtl` files are comment-only
+registration stubs — see below.
 
 ## Which content types a container accepts
 
@@ -46,12 +46,13 @@ in `container.vtl`. Verified: a container holding `Hero.vtl`, `Section.vtl` and
 `Book.vtl` reports exactly those three in the page API's `containerStructures`.
 
 That list is what the **page editor and UVE offer an author** when they add content to
-the slot. It does *not* gate the API — `page_place_content` will place a type that isn't
+the slot. It does *not* gate the API — placement will accept a type that isn't
 on the list, and it renders fine — but a container with no `<Var>.vtl` files offers an
 author nothing, so the slot is uneditable in UVE.
 
-**So a headless build still writes one `<Var>.vtl` per accepted type** — but with **no
-markup in it**. The filename is the entire point; a React component does the rendering:
+**So a headless build still writes one `<Var>.vtl` per accepted type** — as a
+**comment-only registration stub**, never an empty file. The filename is the entire point; a
+React component does the rendering:
 
 ```velocity
 ## Registration only — <Type> is rendered by its React component.

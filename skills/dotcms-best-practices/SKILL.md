@@ -5,34 +5,29 @@ description: Reference for doing any single thing in dotCMS correctly — create
 
 # dotCMS Best Practices
 
-The reference for **one task at a time**. Load the file for what you're doing — never the folder.
-
-Also serves as the build reference for the `dotcms-create-sites` skill, which plans a whole site
-and then works through these files in dependency order. If you're building a complete site from
-scratch, start there instead.
+Load the file for the task at hand — never the folder. Building end to end? The ordered sequence
+is [reference/README.md](reference/README.md). Planning a whole site? Start with
+`dotcms-create-sites`.
 
 ## Read this first
 
-**A missing piece yields a blank or shell-only page with HTTP 200 — never an error.** That single
-fact shapes everything here: you cannot trust a successful response as evidence that anything
-rendered. Every build path ends in an explicit verify step.
+**A missing piece renders blank or shell-only with HTTP 200, never an error.** A successful
+response is not evidence that anything rendered — which is why every build path ends in a verify
+step.
 
 **Establish the delivery mode before any work that touches rendering** — themes, containers,
-templates, components, or diagnosing a blank page. It decides which files apply, and guessing
-wrong wastes the work:
+templates, components, or diagnosing a blank page:
 
 | Mode | dotCMS renders? | You need |
 |---|---|---|
 | **VTL-rendered** | yes — theme + container VTL | `core/` + `vtl/` |
 | **Headless** | no — it serves the page, an app renders it | `core/` + `nextjs/` |
 
-If the user hasn't said and the task touches rendering, ask. **Content-model-only work — creating
-a type, adding fields, creating content — is the same in both modes; don't ask.**
+If the task touches rendering and the user hasn't said, ask. **Content-model work — types,
+fields, content — is identical in both modes; don't ask.**
 
 Building a page for the first time? Start with the wiring contract —
-[reference/core/00-what-must-exist.md](reference/core/00-what-must-exist.md). Four requirements,
-both modes: a published site · a page pointing at a published template whose named containers
-already exist · content placed into a slot · everything published, page last.
+[reference/core/00-what-must-exist.md](reference/core/00-what-must-exist.md).
 
 ## I want to…
 
@@ -82,12 +77,10 @@ Next.js is the only framework branch here. Angular, Vue and Astro have upstream 
 
 ## Something is wrong
 
-**First, split the symptom — this fork is worth more than any other answer.** Ask the user to view
-source: is there *any* markup (header, footer, `<title>`, CSS), or is the body genuinely empty?
-The two have almost disjoint causes.
+**First, split the symptom.** Ask the user to view source: is there *any* markup, or is the body
+genuinely empty? The two have almost disjoint causes.
 
-**Then establish the delivery mode.** Most rows below apply to one mode only, and a VTL row will
-send you hunting for a theme a headless site does not have.
+**Then establish the delivery mode** — most rows below apply to one mode only.
 
 ### Shell renders, content slots are missing
 
@@ -104,8 +97,7 @@ send you hunting for a theme a headless site does not have.
 | headless | The component map has no key for the type, or the case differs | [nextjs/01-component-contract.md](reference/nextjs/01-component-contract.md) |
 | headless | No `<Var>.vtl` registration stub, so UVE never offered the type and nothing was ever placed | [core/06-containers.md](reference/core/06-containers.md) |
 
-`vtl/00-wiring.md` has a compact **missing-thing → what-you-see** table for the VTL cases —
-[go there first if the site is VTL](reference/vtl/00-wiring.md).
+VTL: [vtl/00-wiring.md](reference/vtl/00-wiring.md) has a missing-thing → what-you-see table.
 
 ### Nothing renders at all
 
@@ -119,35 +111,31 @@ send you hunting for a theme a headless site does not have.
 
 ### "I added a content type and it doesn't show up"
 
-The most common report, and it has three candidate causes that look identical in a browser. Check
-all three:
+Three causes look identical in a browser. Check all three:
 
-1. **The type's variable isn't what you think.** dotCMS derives it, a name collision appends a
-   number (`Testimonial` → `testimonial1`), and casing may not follow the name. Read the variable
-   back from dotCMS — [core/02](reference/core/02-content-types.md).
+1. **The `Var` isn't what you think** — read it back from dotCMS rather than assuming it matches
+   the type name ([core/02](reference/core/02-content-types.md)).
 2. **The renderer isn't registered under that variable** — a `<Var>.vtl` file in VTL
    ([vtl/03](reference/vtl/03-containers.md)), a component-map key in headless
    ([nextjs/01](reference/nextjs/01-component-contract.md)). Case-exact.
 3. **The container has no registration stub for the type**, so UVE never offered it and nothing was
    ever placed — [core/06](reference/core/06-containers.md).
 
-A headless map with a fallback for unmapped types makes cause 2 **invisible** — no "no component"
-text ever reaches the screen. Don't rule it out because you didn't see that string.
+A fallback component makes cause 2 **invisible** — no "no component" text reaches the screen, so
+don't rule it out on that basis.
 
 ### Also worth checking, either mode
 
 | Check | Why |
 |---|---|
-| **Language / locale** | Content saved under one language and requested under another can render blank with HTTP 200. This skill doesn't document dotCMS's exact resolution behavior — **fetch it and verify** rather than assuming |
-| **Page cache** | A stale cached page serves old output; `page_verify` reports this as a cache verdict — [vtl/05](reference/vtl/05-verify-and-debug.md) |
-| **Verify properly** | VTL: [vtl/05](reference/vtl/05-verify-and-debug.md) — note `/api/vtl/dynamic` runs outside a request context and cannot see `$CONTENTLETS`, `$dotContentMap`, `$URLMapContent` or `$dotTheme`, so it validates only the parts that don't matter for a container. Headless: [nextjs/05](reference/nextjs/05-verify.md) — `page_verify` does **not** apply |
+| **Language / locale** | Content saved under one language and requested under another can render blank. This skill doesn't document dotCMS's resolution behavior — **fetch it and verify** |
+| **Page cache** | A stale cached page serves old output; page verification reports this as a cache verdict — [vtl/05](reference/vtl/05-verify-and-debug.md) |
+| **Verify properly** | VTL: [vtl/05](reference/vtl/05-verify-and-debug.md) — note `/api/vtl/dynamic` runs outside a request context and cannot see `$CONTENTLETS`, `$dotContentMap`, `$URLMapContent` or `$dotTheme`, so it validates only the parts that don't matter for a container. Headless: [nextjs/05](reference/nextjs/05-verify.md) — page verification does **not** apply |
 
 ## Rules that bite
 
-Four things that cause most failures, stated once so you don't have to hit them:
-
-1. **Identifiers are case-exact.** A container's `<Var>.vtl` filename and a headless component-map
-   key must both equal the content type's Velocity variable exactly. Wrong case renders nothing.
+1. **`Var` matching is case-exact.** A container's `<Var>.vtl` filename and a component-map key
+   must both equal the type's `Var` exactly — read it back, never assume.
 2. **Containers are folders.** There is no create endpoint — you build the folder and its files.
 3. **Placement replaces.** Omitted slots are cleared, not left alone.
 4. **Publishing is explicit and ordered.** LIVE changes only on publish, and the page publishes
@@ -158,16 +146,21 @@ a headless project's `NEXT_PUBLIC_DOTCMS_AUTH_TOKEN` **ships to the browser**. I
 restricted user, and often doesn't — never assume an existing project's is safe for production. See
 [nextjs/00-connect.md §B.1](reference/nextjs/00-connect.md).
 
-## Tool routing
+## Working through the dotCMS MCP server
 
-Authoring goes through the dotCMS MCP tools: `page_create`, `page_place_content`, `page_verify`,
-`upload_assets`, `download_assets`, `search`, `execute`. **Each tool's own description is the source
-of truth for how to call it.** These files cover only what the tools don't say — which tool to reach
-for, and the dotCMS behaviors that live outside any single call.
+The server exposes dotCMS as a **code API you write against**, not a fixed menu of operations.
+The normal loop is: **search the spec to discover the endpoint, then write code that calls it.**
+That is the general path for anything, not a fallback.
 
-Reach for `execute` only when no dedicated tool fits. Run raw VTL through
-`POST /api/vtl/dynamic`. What `search` returns is the source of truth for anything the curated
-OpenAPI spec expresses; these files keep what the spec can't.
+Alongside it, some operations have **purpose-built tools that absorb known traps** — page
+creation, content placement, page verification, asset transfer. **Prefer those where they exist**,
+not because writing code is worse, but because those tools already handle the failure modes these
+files would otherwise have to teach you.
+
+**Enumerate the MCP server's tools and read their descriptions — each description is the source of
+truth** for how to call it. These files name no tools, so they don't go stale when one is renamed
+or added. What spec search returns is authoritative for anything the curated OpenAPI spec
+expresses; these files keep only what it can't. Run raw VTL through `POST /api/vtl/dynamic`.
 
 ## Index by build step
 

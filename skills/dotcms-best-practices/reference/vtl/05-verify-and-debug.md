@@ -3,7 +3,7 @@
 Content that saved with HTTP 200 can still render blank. Verification has **two layers** — they catch different failures, and passing one does NOT imply the other:
 
 - **Layer 1 — validate the VTL** (`/api/vtl/dynamic`): does the code parse and do its toolbox/`$dotcontent` calls execute? This runs in a **request context, not a render context** — so it cannot see anything the page pipeline injects.
-- **Layer 2 — verify the render** (the `page_verify` tool): does the assembled page actually produce HTML in each slot? This is the only layer that exercises the full pipeline (`$URLMapContent`, `$CONTENTLETS`, `$dotTheme`, per-container vars).
+- **Layer 2 — verify the render** (page verification): does the assembled page actually produce HTML in each slot? This is the only layer that exercises the full pipeline (`$URLMapContent`, `$CONTENTLETS`, `$dotTheme`, per-container vars).
 
 A container/detail VTL that is syntactically perfect in Layer 1 can still render blank in Layer 2. Do both.
 
@@ -30,12 +30,12 @@ So Layer 1 fully validates a **listing/query VTL or a `$dotJSON` script**. For a
 
 ---
 
-## Layer 2 — verify the render with `page_verify`
+## Layer 2 — verify the render
 
-Call the `page_verify` tool (`path`, optional `site`/`mode`). It renders the page, absorbs the raw `page/render` footguns (host resolution, the `200 ≠ rendered` trap, the two rendered layers that disagree), and returns a per-slot `verdict` — its description is the source of truth for the mechanics. Each verdict tells you where the fix lives:
+Call the page-verification tool. It renders the page, absorbs the raw `page/render` footguns (host resolution, the `200 ≠ rendered` trap, the two rendered layers that disagree), and returns a per-slot `verdict` — its description is the source of truth for the mechanics. Each verdict tells you where the fix lives:
 
 - **`empty-vtl-error`** — content is placed but the slot rendered empty → the VTL failed. Back to Layer 1: run that container's VTL through `/api/vtl/dynamic` for the line/column.
-- **`empty-no-content`** — slot resolved but nothing placed → a placement gap, not a code bug. Fill it with `page_place_content` ([09-placement.md](../core/09-placement.md)).
+- **`empty-no-content`** — slot resolved but nothing placed → a placement gap, not a code bug. Fill it via content placement ([09-placement.md](../core/09-placement.md)).
 - **`cache-stale`** — slot rendered but `page.rendered` is empty → page cache. Set `cachettl:"0"` and re-publish (publish rules: [core/00](../core/00-what-must-exist.md)).
 - **Renders, but wrong/empty field** (verdict `ok`, output looks off) → a correctness bug, not a pipeline break — see the rules below.
 
@@ -53,7 +53,7 @@ When the render is empty or shows the wrong value (not a hard error), the cause 
 - **A Select/Checkbox field treated as a string, a method called on a literal, a reassigned context object, a typo'd method printing as text** → the VTL gotchas in [velocity.md](velocity.md) §5.
 - **A broken image** (`${field}` instead of the `/dA/` URL) → the images rule in [velocity.md](velocity.md) §4.
 
-### `execute` sandbox (it's JavaScript, not VTL)
+### The code-execution sandbox (it's JavaScript, not VTL)
 - **Velocity vars don't exist here.** `$dotcontent`, `$date`, `#foreach` → `ReferenceError`. Query content via `POST /api/content/_search` (`{query, limit, sort}` — **not** `/api/v1/content/...`, which 404s misleadingly). Run VTL only through `POST /api/vtl/dynamic`.
 - **`await` everything; return only JSON-serializable values.** An un-awaited Promise (or a function/class) → `DataCloneError`. Return plain objects/arrays/strings.
 - **Watch string literals.** A raw apostrophe in a single-quoted JS string (`'grandchild's'`) → `SyntaxError`. Use double quotes or escape.

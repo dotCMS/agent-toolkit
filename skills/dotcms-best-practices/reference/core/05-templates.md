@@ -19,7 +19,7 @@ authors markup in the per-type `<Var>.vtl` ([vtl/03](../vtl/03-containers.md)).
 **Don't over-decompose the layout.** A content-driven page usually wants **one row, one column, one flexible container** (a single container rendering many content types — see [06-containers.md](06-containers.md)), with the page placing its sections into that one slot in order. Reach for multiple rows/slots only for a real 2-D layout (side-by-side columns) or a genuinely separate render path (a widget slot, a URL-mapped detail). A stack of N fixed per-type slots (one row each) is the common anti-pattern: it's rigid and leaves blank slots to hide on pages that skip a section.
 
 ## Creating a template — one POST, then publish
-Send `layout`; never send `drawed` or `body`. The server sets `drawed` for you, and `layout` is what supplies `$dotThemeLayout` (the theme's row/column loop) and the slots `page_place_content` addresses.
+Send `layout`; never send `drawed` or `body`. The server sets `drawed` for you, and `layout` is what supplies `$dotThemeLayout` (the theme's row/column loop) and the slots the placement tool addresses.
 
 ```json
 { "title": "Main", "friendlyName": "Main layout",
@@ -43,4 +43,4 @@ Then publish. `identifier` is ignored on POST. The result has `body: null` and t
 `layout.containers[].identifier` (`ContainerUUID.identifier`) legitimately accepts **either** a database identifier (a full UUID or a dotCMS shorty id) for a DB container, **or** a host-qualified file path (`//<site>/application/containers/<name>/`) for a Container-as-File — the spec now documents all accepted forms. The real trap is a value that **doesn't resolve on the target site**: it produces no container at render time (the slot renders empty / placement can't find the slot), with no hard error. It does NOT silently fall back to the system container.
 - For a file container, use the full host-qualified path for the site you're building on: `"//<site>/application/containers/<name>/"` (a relative path resolves against the *current* site, which may not be yours), with `uuid:"1"`.
 - For a DB container, pass its exact identifier.
-- After setting the layout, republish the template, then place content with `page_place_content` ([09-placement.md](09-placement.md)).
+- After setting the layout, republish the template, then place content ([09-placement.md](09-placement.md)).
