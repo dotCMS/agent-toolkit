@@ -18,6 +18,7 @@ changing anything that crosses the boundary.
 |---|---|---|
 | **`PLAN.md`** | **This repo's plan. Start here.** The two skills, content changes forced by CLI decisions, distribution, manifests, the seam with the CLI | Updated as work lands |
 | `../core/docs/cli/CLI_DISTRIBUTION_PLAN.md` | The paired CLI plan — capability libraries, command surface, client registry, secrets, phases | Lives in `dotcms/core` |
+| `architecture.md` | How the two skills fit together — the corpus, its three indexes, the delivery-mode fork, build order, install model, and where the CLI stops | Diagrams; update when the shape changes |
 | `dotcli.md` | The dotCLI MVP spec — its four invariants, commands, API surface. Consumed by the CLI plan, not replaced by it | Freddy's, authoritative |
 | `ecosystem.md` | Inventory — every package, version, command surface, repo location, npm namespace. No analysis | Re-check before relying |
 | `archive/findings.md` | Verified facts, each with source and date checked. Facts about npm versions and competitor behavior rot | **Goes stale** |
