@@ -39,8 +39,8 @@ Then publish. `identifier` is ignored on POST. The result has `body: null` and t
 ## Fetch a template's working layout via `/working`
 `GET /api/v1/templates/{templateId}/working`. Included in the filtered spec, so `spec.paths['/api/v1/templates/{templateId}/working']?.get` resolves — but still guard with `?.`.
 
-## Layout container `identifier` must RESOLVE — path or DB id both valid (correction)
-Correction to the earlier "path, not inode" framing: `layout.containers[].identifier` (`ContainerUUID.identifier`) legitimately accepts **either** a database identifier (a full UUID or a dotCMS shorty id) for a DB container, **or** a host-qualified file path (`//<site>/application/containers/<name>/`) for a Container-as-File — the spec now documents all accepted forms. The real trap is a value that **doesn't resolve on the target site**: it produces no container at render time (the slot renders empty / placement can't find the slot), with no hard error. It does NOT silently fall back to the system container.
+## Layout container `identifier` must RESOLVE — path or DB id both valid
+`layout.containers[].identifier` (`ContainerUUID.identifier`) legitimately accepts **either** a database identifier (a full UUID or a dotCMS shorty id) for a DB container, **or** a host-qualified file path (`//<site>/application/containers/<name>/`) for a Container-as-File — the spec now documents all accepted forms. The real trap is a value that **doesn't resolve on the target site**: it produces no container at render time (the slot renders empty / placement can't find the slot), with no hard error. It does NOT silently fall back to the system container.
 - For a file container, use the full host-qualified path for the site you're building on: `"//<site>/application/containers/<name>/"` (a relative path resolves against the *current* site, which may not be yours), with `uuid:"1"`.
 - For a DB container, pass its exact identifier.
 - After setting the layout, republish the template, then place content with `page_place_content` ([09-placement.md](09-placement.md)).

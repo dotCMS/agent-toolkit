@@ -27,6 +27,7 @@ reserved ([core/03](../core/03-content.md)).
   themes/<name>/
     template.vtl          REQUIRED — html shell + the $dotThemeLayout loop
     <partial>.vtl         optional, included via ${dotTheme.path}<name>.vtl
+    <styles>.css          the site's CSS lives here, in the theme ([02](02-themes.md))
   containers/<name>/
     container.vtl         REQUIRED — metadata only, $dotJSON.put
     preloop.vtl           REQUIRED — must be non-empty, a comment is enough

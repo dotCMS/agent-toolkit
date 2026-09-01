@@ -46,7 +46,7 @@ follows is hard to see.
 
 | Role | What it does |
 |---|---|
-| **Config** | the four env values, read once and exported |
+| **Config** | the env values, read once and exported |
 | **Client** | a single `createDotCMSClient` instance |
 | **Catch-all route** | maps a URL to a dotCMS page and renders it |
 | **Component map** | content-type variable → React component, plus a fallback for unmapped types |
@@ -69,14 +69,16 @@ the component and register it under the content type's Velocity variable, case-e
 
 ### 1. Configure
 
-Four values, centralised rather than read from `process.env` at each call site:
+Three values at minimum, centralised rather than read from `process.env` at each call site:
 
 ```ts
 NEXT_PUBLIC_DOTCMS_HOST       // instance URL
 NEXT_PUBLIC_DOTCMS_AUTH_TOKEN // API token — see the warning below
 NEXT_PUBLIC_DOTCMS_SITE_ID    // the site you built
-NEXT_PUBLIC_DOTCMS_MODE       // DotCMSPageRendererMode
 ```
+
+A project may carry more than these — read what's there rather than assuming this list is
+complete.
 
 **The token ships to the browser.** `NEXT_PUBLIC_*` inlines a value into the client
 bundle. That is deliberate — the UVE bridge runs client-side and needs it.

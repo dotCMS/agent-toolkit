@@ -161,6 +161,21 @@ Stated identically in both plans. This is where a two-repo split goes wrong.
 - Write the inventory script.
 - Write the four manifests; agent-plugins.org to the documented shape despite the 404s.
 
+**Validated 2026-09-01** — four agents were each given only the skills directory and one task
+(create a content type · build a site · diagnose a blank page · add a component to an existing
+Next.js app) and reported where they landed. Routing worked; the friction was all at the seams.
+Fixed as a result: the symptom index was mode-blind and merged "blank" with "shell-only" (its two
+most disjoint cause sets); its best routing key was a string a fallback component prevents from
+ever appearing; `nextjs/01` never linked back to the repo-inspection guidance; verify files were
+filed only under debugging though they are required build steps; the delivery-mode gate fired on
+content-model work where it does not apply; `vtl/00` was uncited by the build checklist; two
+`reference/build/` paths survived in `reference/plan/`, one of them inside the paragraph copied
+into every generated PLAN.md; and DESIGN.md had no consumer — it now lands as CSS in the theme
+folder.
+
+**Still worth doing:** a real build against a live instance. Every fact in these files came from
+reading, and navigation tests cannot catch a wrong fact.
+
 **Unresolved**
 
 - **Who owns instance discovery?** The skill ships an inventory script (this repo) and the CLI has an

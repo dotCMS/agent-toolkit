@@ -16,8 +16,27 @@ export const pageComponents = {
 };
 ```
 
-Keys are **case-exact** and must equal the content type's variable name — the same
-value `core/02` warns you to check against the reserved-name list. Because of this,
-create and name the content type *before* writing its component.
+## The key must equal the type's variable, case-exact
+
+And **you cannot assume the variable equals the type's name.** dotCMS derives it, a name
+collision appends a number — a second `Testimonial` becomes `testimonial1` — and casing does
+not reliably follow the name. **Read the variable back from dotCMS and use that value**
+([core/02](../core/02-content-types.md)). A key that differs by one character renders nothing.
+
+Create and name the content type *before* writing its component, so the variable exists to
+copy.
+
+## Before you write anything, find the existing map
+
+**Do not create a component map.** In any working app one already exists, and a second one
+means half your types silently don't render. Where it lives and how to recognise it — along
+with the other four wiring roles — is in [00 §B](00-connect.md). Add a key to what's there.
+
+## A "no component" fallback hides this failure
+
+If the map has a fallback for unmapped types, a missing key does **not** print "no component"
+on the page — it renders the fallback, or nothing an author would recognise as an error. So a
+missing key and a missing container stub ([core/06](../core/06-containers.md)) look identical
+from the browser. Check both.
 
 Rules and lazy-loading: **@dotcms/react README → Component Mapping**.

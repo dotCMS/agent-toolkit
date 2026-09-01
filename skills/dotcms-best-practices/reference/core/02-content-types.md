@@ -2,6 +2,9 @@
 
 Creating the content types (data types + editable-section types) and their fields.
 
+There is no dedicated MCP tool for content types — go through `execute`, the same as sites
+([01](01-site.md)).
+
 The content-type create body, its `fields[]` array (field `clazz` values, `dataType` mapping, boolean-via-RadioField, Story Block, the `workflow` key, row/column layout), the `type=` base-type filter, and fetch-by-id are all documented in the OpenAPI spec — read them with the `search` tool (`spec.paths['/api/v1/contenttype']`, schema `ContentTypeRequestView`). This file keeps only what the spec can't express.
 
 ## Every type needs a Site-or-Folder field and a workflow
@@ -16,12 +19,29 @@ Set both in the create body. Each has a silent failure mode, and neither is conv
 
 **Workflow** — associate a scheme with the `workflow` array. There is no endpoint to
 attach one to an existing type ([03-content.md](03-content.md)), so getting this wrong
-means recreating the type. The System Workflow is the safe default — get its id from
-`GET /api/v1/workflow/schemes`:
+means recreating the type. The System Workflow is the safe default.
+
+**Always fetch the id — never hardcode it.** `GET /api/v1/workflow/schemes` and read the id of
+the scheme you want; ids are not guaranteed to be the same across installs.
 
 ```json
-{ "workflow": ["d61a59e1-a49c-46f2-a929-db2b4bfa88b2"] }
+{ "workflow": ["<id from GET /api/v1/workflow/schemes>"] }
 ```
+
+## The variable is derived, and you must read it back
+
+**You do not choose the variable — dotCMS derives it from the name**, and the result may not
+match what you'd guess. Two things to know:
+
+- **A name collision appends a number.** Create `Testimonial` when a `Testimonial` already
+  exists and the new type's variable becomes `testimonial1`. The create still succeeds.
+- **Casing is not guaranteed to follow the name.**
+
+The variable is the key everything else matches on, case-exact — a container's `<Var>.vtl`
+filename ([vtl/03](../vtl/03-containers.md)) and a headless component-map key
+([nextjs/01](../nextjs/01-component-contract.md)). So **after creating a type, read the variable
+back off the response or fetch the type, and use that value.** Assuming it equals the name is
+the cause of a whole class of silent blank renders.
 
 ## Reserved variable names
 Variable names must match `[_A-Za-z][_0-9A-Za-z]*` (start with a letter or `_`, then only letters/digits/underscores — no spaces, no leading digit, no special characters). The words below are not allowed; matching is case-insensitive. If you need one, prefix it: `Host` → `AwazonHost`, field `type` → `productType`.
@@ -38,8 +58,7 @@ Creating a `WIDGET` base type auto-adds `widgetTitle`, `widgetUsage`, `widgetPre
 
 Build consequence: a widget's code is set as part of **building the type**, not part of creating the content. Set the field's `values` (inline in the create body, or via the v3 fields endpoints above). A widget's *author-set* fields — heading, limit, category — are ordinary per-contentlet values; only the constant fields behave this way.
 
-## URL-mapped types (detail pages)
-## URL-mapped types need two more keys — set them AFTER the page exists
+## URL-mapped types (detail pages) — two more keys, set AFTER the page exists
 
 If this type drives a detail page, it needs both of these on the type, in **either**
 delivery mode:

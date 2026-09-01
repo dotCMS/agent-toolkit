@@ -48,7 +48,8 @@ This is the checklist your drafted plan must **cover** — not a list to ask one
 
 ## What NOT to ask
 
-The build owns these; asking is noise. Check the `reference/build/` files and the codebase first — never re-ask what they answer:
+The build owns these; asking is noise. Check the `dotcms-best-practices` skill's references and
+the codebase first — never re-ask what they answer:
 
 - Content-type vs. widget vs. SimpleWidget; container scaffold; per-type VTL.
 - urlmap patterns, detail-page wiring, template/theme mechanics.

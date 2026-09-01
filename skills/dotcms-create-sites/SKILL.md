@@ -28,38 +28,43 @@ Plan Progress (Phase 1) — references live in reference/plan/:
         carrying a heading tag — and PLAN.md's top checklist lists all gaps
 - [ ] 7. Confirm the plan with the user before building
 
-Build Progress (Phase 2) — every file cited below lives in the **dotcms-best-practices** skill,
-under its reference/ folder. Load that skill and open only the file for the step you're on; its
-reference/README.md has the branch map and tool routing.
+Build Progress (Phase 2)
+>> EVERY file cited below is `dotcms-best-practices/reference/<branch>/<file>`. Load that skill
+>> once, up front. Its reference/README.md carries the same list in dependency order plus the
+>> branch map and tool routing.
+>> Note: step numbers and file numbers are different sequences — step 9 is not core/09.
 Order is dependency order: everything needs the site, a template needs its theme and
 containers, and a page needs the template — so the scaffold is built bottom-up before
 pages and placement.
-- [ ] 8.  Check what a page needs to render — the wiring contract (core/00)
+- [ ] 8.  Check what a page needs to render — the wiring contract (core/00-what-must-exist.md)
 - [ ] 9.  Choose the mechanism per need — DESIGN ONLY, nothing is built yet.
           VTL: content type vs widget vs detail page. Headless: plan one component
-          per content type that can appear on a page ({vtl,nextjs}/01)
-- [ ] 10. Create and publish the SITE — everything below needs its id (core/01)
-- [ ] 11. Create content types — data + editable sections (core/02)
+          per content type that can appear on a page (vtl/01-choose-mechanism.md or nextjs/01-component-contract.md)
+- [ ] 10. Create and publish the SITE — everything below needs its id (core/01-site.md)
+- [ ] 11. Create content types — data + editable sections (core/02-content-types.md)
 - [ ] 12. Build the rendering scaffold, IN THIS ORDER (the template's POST names
           container paths that must already resolve, plus a theme id if VTL):
-          a. theme — VTL: create it (vtl/02). HEADLESS: create NO theme; omit
-             the key and the template takes SYSTEM_THEME.
-          b. containers (core/06) — both modes create the folder and one
-             <Var>.vtl per accepted type. VTL writes the markup (vtl/03);
+          a. theme — VTL: read vtl/00-wiring.md first (the full file tree you must author,
+             and the author-locally-then-upload rule), then create it (vtl/02-themes.md).
+             **DESIGN.md is consumed here**: its tokens become CSS in the theme folder —
+             there is no separate design step and no other home for the stylesheet.
+             HEADLESS: create NO theme; omit the key and the template takes SYSTEM_THEME.
+          b. containers (core/06-containers.md) — both modes create the folder and one
+             <Var>.vtl per accepted type. VTL writes the markup (vtl/03-containers.md);
              HEADLESS leaves those files empty — React renders, the filename only
              registers the type for the editor.
-          c. create + publish the template (core/05)
+          c. create + publish the template (core/05-templates.md)
           d. HEADLESS ONLY — the app side, once the types from step 11 exist:
-             client config (nextjs/00), next.config (02), routing (03), and
+             client config (nextjs/00-connect.md), next.config (02), routing (03), and
              **write + register one component per content type** (01). The map keys
              are the type variables, so the types must exist first. Skip this and
              every slot renders "no component".
-- [ ] 13. Create pages — requires the template from step 12c (core/04)
-- [ ] 14. Wire listings & detail pages ({vtl,nextjs}/04)
-- [ ] 15. Create content — fire an action on each contentlet (core/03)
-- [ ] 16. Place content into slots — requires the container from step 12b (core/09)
+- [ ] 13. Create pages — requires the template from step 12c (core/04-pages.md)
+- [ ] 14. Wire listings & detail pages (vtl/04-listings-and-details.md or nextjs/04-listings-and-details.md)
+- [ ] 15. Create content — fire an action on each contentlet (core/03-content.md)
+- [ ] 16. Place content into slots — requires the container from step 12b (core/09-placement.md)
 - [ ] 17. Publish everything, page last
-- [ ] 18. Verify ({vtl,nextjs}/05) — VTL: validate with /api/vtl/dynamic AND
+- [ ] 18. Verify (vtl/05-verify-and-debug.md or nextjs/05-verify.md) — VTL: validate with /api/vtl/dynamic AND
           page_verify every page type. Headless: page_verify does NOT apply; confirm
           every content type on every page resolves to a component.
           Either way, nothing renders as [PLACEHOLDER] that shouldn't

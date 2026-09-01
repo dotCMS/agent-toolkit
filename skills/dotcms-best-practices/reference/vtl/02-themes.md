@@ -3,6 +3,13 @@
 The theme is the HTML shell that wraps the template's layout. Templates are in [05-templates.md](../core/05-templates.md); containers in [03-containers.md](03-containers.md). VTL syntax: [velocity.md](velocity.md).
 
 ## Theme (`/application/themes/<name>/`)
+
+**The site's CSS lives in the theme folder** — alongside `template.vtl`, referenced from the
+shell via `${dotTheme.path}`, never a hardcoded path. If you were handed a `DESIGN.md`, this is
+where its tokens become real: the design system's colors, type scale and spacing become CSS
+custom properties in a stylesheet here. There is no separate design step and no other home for
+it.
+
 - Only `template.vtl` required (html shell + layout loop). `#dotParse` partials via `${dotTheme.path}<name>.vtl` — never hardcode paths.
 - Grid: `.width` / `.leftOffset` are 1–12 → map onto CSS Grid.
 - The layout loop renders containers with `$render.eval($column.draw())` — see below. Getting this wrong is the single most expensive failure in a theme build.
