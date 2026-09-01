@@ -1,0 +1,42 @@
+name: Validate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Manifests and skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      # The check that matters: `skills add` SKIPS a skill with bad frontmatter,
+      # printing a warning and exiting 0. Without this a broken skill ships as a no-op.
+      - name: Skills are discoverable
+        run: npx -y skills add . --list --full-depth 2>&1 | tee /dev/stderr | grep -q "Found"
+
+      - name: Skill frontmatter and manifest drift
+        run: node scripts/validate-skills.mjs
+
+      - name: Claude Code manifests
+        run: npx -y @anthropic-ai/claude-code plugin validate . --strict
+
+      - name: Agent Plugins manifests
+        run: node scripts/validate-agent-plugin.mjs

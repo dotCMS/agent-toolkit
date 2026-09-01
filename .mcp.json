@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "dotcms": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@dotcms/mcp-server@latest"],
+      "env": {
+        "DOTCMS_URL": "${DOTCMS_URL}",
+        "AUTH_TOKEN": "${AUTH_TOKEN}"
+      }
+    }
+  }
+}

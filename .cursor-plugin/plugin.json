@@ -1,0 +1,24 @@
+{
+  "name": "dotcms",
+  "displayName": "dotCMS",
+  "version": "0.1.0",
+  "description": "dotCMS plugin for Cursor with MCP server and agent skills for building and maintaining dotCMS sites.",
+  "author": {
+    "name": "dotCMS",
+    "email": "support@dotcms.com"
+  },
+  "homepage": "https://github.com/dotCMS/agent-toolkit",
+  "repository": "https://github.com/dotCMS/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "dotcms",
+    "cms",
+    "content",
+    "content-management",
+    "vtl",
+    "velocity",
+    "nextjs",
+    "headless"
+  ],
+  "mcpServers": "./.mcp.json"
+}

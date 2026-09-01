@@ -1,0 +1,27 @@
+{
+  "$schema": "https://www.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "dotcms",
+  "displayName": "dotCMS",
+  "version": "0.1.0",
+  "description": "Build and maintain dotCMS sites — content types, pages, templates, containers, VTL, and headless Next.js — with an MCP server and agent skills.",
+  "author": {
+    "name": "dotCMS",
+    "email": "support@dotcms.com",
+    "url": "https://www.dotcms.com"
+  },
+  "homepage": "https://github.com/dotCMS/agent-toolkit",
+  "repository": "https://github.com/dotCMS/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "dotcms",
+    "cms",
+    "content",
+    "content-management",
+    "vtl",
+    "velocity",
+    "nextjs",
+    "headless",
+    "universal-visual-editor"
+  ],
+  "skills": "./skills"
+}

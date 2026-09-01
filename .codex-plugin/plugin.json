@@ -1,0 +1,45 @@
+{
+  "name": "dotcms",
+  "version": "0.1.0",
+  "description": "dotCMS plugin for Codex with MCP server and agent skills.",
+  "author": {
+    "name": "dotCMS",
+    "email": "support@dotcms.com",
+    "url": "https://www.dotcms.com"
+  },
+  "homepage": "https://github.com/dotCMS/agent-toolkit",
+  "repository": "https://github.com/dotCMS/agent-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "dotcms",
+    "cms",
+    "content",
+    "content-management",
+    "vtl",
+    "velocity",
+    "nextjs",
+    "headless"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "dotCMS",
+    "shortDescription": "Build and maintain dotCMS sites from your editor",
+    "longDescription": "Plan and build complete dotCMS sites, or do one thing correctly — create a content type, page, template or container; place content; author VTL; wire a headless Next.js frontend. Works for both VTL-rendered and headless delivery, and knows why a dotCMS page renders blank with HTTP 200.",
+    "developerName": "dotCMS",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://www.dotcms.com",
+    "privacyPolicyURL": "https://dev.dotcms.com/docs/privacy-policy",
+    "termsOfServiceURL": "https://www.dotcms.com/terms",
+    "defaultPrompt": [
+      "Get started with dotCMS",
+      "Create a content type for blog posts with a title, body, author and publish date",
+      "My dotCMS page renders blank with a 200 — find out why"
+    ]
+  }
+}

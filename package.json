@@ -1,0 +1,20 @@
+{
+  "name": "@dotcms/agent-toolkit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "dotCMS agent skills and plugin manifests for Claude Code, Cursor, Codex, and any Agent Skills-compatible agent.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dotCMS/agent-toolkit.git"
+  },
+  "scripts": {
+    "validate": "npm run validate:skills && npm run validate:agent-plugin && npm run validate:claude",
+    "validate:skills": "node scripts/validate-skills.mjs",
+    "validate:agent-plugin": "node scripts/validate-agent-plugin.mjs",
+    "validate:claude": "npx -y @anthropic-ai/claude-code plugin validate . --strict"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1"
+  }
+}
