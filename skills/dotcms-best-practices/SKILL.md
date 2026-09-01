@@ -64,7 +64,7 @@ If the user hasn't said, ask. Guessing wrong wastes the whole build.
 
 | Task | File |
 |---|---|
-| Connect an app to dotCMS and render a page | [nextjs/00-connect.md](reference/nextjs/00-connect.md) |
+| Connect an app to dotCMS and render a page | [nextjs/00-connect.md](reference/nextjs/00-connect.md) — §A is yours in every case; §B is what `dotcms init` already wrote |
 | Register a component for a content type | [nextjs/01-component-contract.md](reference/nextjs/01-component-contract.md) |
 | Configure `next.config` | [nextjs/02-next-config.md](reference/nextjs/02-next-config.md) |
 | Set up routing | [nextjs/03-routing.md](reference/nextjs/03-routing.md) |
@@ -98,6 +98,11 @@ Four things that cause most failures, stated once so you don't have to hit them:
 3. **Placement replaces.** Omitted slots are cleared, not left alone.
 4. **Publishing is explicit and ordered.** LIVE changes only on publish, and the page publishes
    last — after content, placement, or a template edit.
+
+And one that isn't a build failure but matters: a headless project's
+`NEXT_PUBLIC_DOTCMS_AUTH_TOKEN` **ships to the browser**, and a scaffolded project's token carries
+the permissions of whoever ran the CLI. It is development-only — see
+[nextjs/00-connect.md §B.1](reference/nextjs/00-connect.md).
 
 ## Tool routing
 
