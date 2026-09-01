@@ -53,7 +53,7 @@ If the user hasn't said, ask. Guessing wrong wastes the whole build.
 
 | Task | File |
 |---|---|
-| Know what VTL mode adds, and see the whole tree you must author | [vtl/00-wiring.md](reference/vtl/00-wiring.md) — **nothing scaffolds VTL; start here** |
+| Know what VTL mode adds, and see the whole tree you must author | [vtl/00-wiring.md](reference/vtl/00-wiring.md) — **start here for VTL** |
 | Decide how something should render — content type vs widget vs detail page | [vtl/01-choose-mechanism.md](reference/vtl/01-choose-mechanism.md) |
 | Build a theme — HTML shell, grid, SEO | [vtl/02-themes.md](reference/vtl/02-themes.md) |
 | Write container markup | [vtl/03-containers.md](reference/vtl/03-containers.md) |
@@ -64,7 +64,7 @@ If the user hasn't said, ask. Guessing wrong wastes the whole build.
 
 | Task | File |
 |---|---|
-| Connect an app to dotCMS and render a page | [nextjs/00-connect.md](reference/nextjs/00-connect.md) — §A is yours in every case; §B is what `dotcms init` already wrote |
+| Connect an app to dotCMS and render a page | [nextjs/00-connect.md](reference/nextjs/00-connect.md) — §A is the dotCMS side; §B is the app wiring, with how to tell what already exists |
 | Register a component for a content type | [nextjs/01-component-contract.md](reference/nextjs/01-component-contract.md) |
 | Configure `next.config` | [nextjs/02-next-config.md](reference/nextjs/02-next-config.md) |
 | Set up routing | [nextjs/03-routing.md](reference/nextjs/03-routing.md) |
@@ -103,8 +103,8 @@ Four things that cause most failures, stated once so you don't have to hit them:
    last — after content, placement, or a template edit.
 
 And one that isn't a build failure but matters: a headless project's
-`NEXT_PUBLIC_DOTCMS_AUTH_TOKEN` **ships to the browser**, and a scaffolded project's token carries
-the permissions of whoever ran the CLI. It is development-only — see
+a headless project's `NEXT_PUBLIC_DOTCMS_AUTH_TOKEN` **ships to the browser**. It should belong to a
+restricted user, and often doesn't — never assume an existing project's is safe for production. See
 [nextjs/00-connect.md §B.1](reference/nextjs/00-connect.md).
 
 ## Tool routing

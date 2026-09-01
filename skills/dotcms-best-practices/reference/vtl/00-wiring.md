@@ -1,9 +1,9 @@
 # 00 · VTL wiring
 
-**Nothing scaffolds this for you.** In headless, `dotcms init` writes the app wiring and you
-extend it ([nextjs/00 §B](../nextjs/00-connect.md)). In VTL there is no equivalent: the CLI
-creates an empty project directory and every file below is yours to author. Read this before
-building anything in VTL mode.
+**Every file below is yours to author** — VTL mode has no app scaffold to inherit, so read
+this before building anything. If you're working in an existing site, list
+`/application/themes/` and `/application/containers/` first and extend what's there rather
+than duplicating it.
 
 In addition to [core/00](../core/00-what-must-exist.md), a VTL-rendered page needs:
 
