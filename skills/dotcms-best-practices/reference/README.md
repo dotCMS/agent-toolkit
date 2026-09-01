@@ -1,9 +1,12 @@
-# Build reference — index
+# Reference — index
 
-Phase 2 of the skill. **Load only the file for the step you're on** — don't read the
-folder up front.
+**Load only the file for the task you're on** — don't read the folder up front.
 
-The build forks by **delivery mode**, decided in Phase 1 and recorded in PLAN.md §3b:
+Indexed by build step here; the skill's `SKILL.md` indexes the same files by intent, which is
+the better entry point for a single task.
+
+The work forks by **delivery mode**. Establish it before building — if you came from
+`dotcms-create-sites`, Phase 1 recorded it in PLAN.md §3b; otherwise ask:
 
 | Mode | You build | Branch |
 |------|-----------|--------|

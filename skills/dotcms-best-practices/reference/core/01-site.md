@@ -5,8 +5,9 @@ identifier: content types scope content to it, assets upload into its folder tre
 the template payload carries `siteId`, and pages are created under it. Create it
 before anything else.
 
-Use the hostname from PLAN.md §2. There is no dedicated MCP tool for sites — go
-through `execute`.
+You need a hostname before starting — from PLAN.md §2 if you came from
+`dotcms-create-sites`, otherwise ask for it; never invent one. There is no dedicated MCP
+tool for sites — go through `execute`.
 
 ## Create (or reuse) the site
 

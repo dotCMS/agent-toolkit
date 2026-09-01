@@ -49,23 +49,27 @@ WordPress, Drupal each need real research) and it does not block onboarding.
 Today `dotcms-create-sites` is an orchestrator with no reference: nothing answers *"create a content
 type."* Extract **`dotcms-best-practices`** from it.
 
-The extraction is cheap because the skill is already split along that seam:
+**Done 2026-09-01.** The extraction was cheap because the skill was already split along that seam —
+`reference/build/` had exactly two references to the plan artifacts and none into `reference/plan/`.
 
 ```
-skills/dotcms-create-sites/
-  SKILL.md              113 lines   orchestration  → stays
-  reference/plan/       225 lines   orchestration  → stays
-  reference/build/      940 lines   already a task-indexed manual  → becomes the new skill's body
-    core/    8 files    what-must-exist, site, content-types, content,
-                        pages, templates, containers, placement
-    vtl/     7 files
-    nextjs/  6 files
+skills/
+  dotcms-create-sites/
+    SKILL.md            101 lines   orchestration; cites the other skill by name
+    reference/plan/     225 lines   interview, plan-template, design-template
+  dotcms-best-practices/
+    SKILL.md            116 lines   intent-indexed front door (new)
+    reference/         1257 lines   22 files — core/ 8, vtl/ 7, nextjs/ 6, README
 ```
 
-`reference/build/`'s own README already says *"Load only the file for the step you're on — don't
-read the folder up front."* That is a lookup manual, not a workflow. The new skill is an
-**intent-indexed front door** over existing content — indexed by what the user wants rather than by
-build step — not a rewrite.
+The new front door indexes the same files **by intent** rather than by build step, and adds a
+**symptom index** — blank page, "no component", empty VTL slot, layout change not taking effect —
+which is the thing a build-step index cannot do. `reference/README.md` still carries the
+dependency-order index for full builds.
+
+**How they share content without duplicating it:** `create-sites` cites `core/NN`, `vtl/NN`,
+`nextjs/NN` and says the files live in `dotcms-best-practices` — by skill name, never by relative
+path, since a path across two installed skills resolves unreliably through symlinks.
 
 **Sharing, not duplicating.** Skill frontmatter has no dependency mechanism (`name` and
 `description` only), and none is needed: both skills install from the same
@@ -74,7 +78,7 @@ reference content exists once.
 
 ## 5. Skill content changes forced by CLI decisions
 
-**Headless — `reference/build/nextjs/00-connect.md` splits.** Roughly half of it (the four env vars,
+**Headless — `dotcms-best-practices/reference/nextjs/00-connect.md` splits.** Roughly half of it (the four env vars,
 `createDotCMSClient`, `DotCMSLayoutBody`/`useEditableDotCMSPage`) becomes *"the CLI already did this
 — here is the shape you will find."* The other half stays essential and the CLI cannot provide it:
 in headless you omit the theme so the server assigns `SYSTEM_THEME`, containers are still required,
@@ -149,8 +153,9 @@ Stated identically in both plans. This is where a two-repo split goes wrong.
 
 **Build**
 
-- Extract `dotcms-best-practices` — intent-indexed front door over `reference/build/`.
+- ~~Extract `dotcms-best-practices`~~ — **done 2026-09-01.**
 - Rewrite the CLI-owned half of `nextjs/00-connect.md` as "here is the shape you will find."
+  Now at `skills/dotcms-best-practices/reference/nextjs/00-connect.md`.
 - Harden the traditional branch: make the `$dotThemeLayout` requirement and the directory structure
   impossible to miss.
 - Write the inventory script.
