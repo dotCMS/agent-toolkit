@@ -53,7 +53,7 @@ If the user hasn't said, ask. Guessing wrong wastes the whole build.
 
 | Task | File |
 |---|---|
-| Know what VTL mode adds on top of the contract | [vtl/00-wiring.md](reference/vtl/00-wiring.md) |
+| Know what VTL mode adds, and see the whole tree you must author | [vtl/00-wiring.md](reference/vtl/00-wiring.md) — **nothing scaffolds VTL; start here** |
 | Decide how something should render — content type vs widget vs detail page | [vtl/01-choose-mechanism.md](reference/vtl/01-choose-mechanism.md) |
 | Build a theme — HTML shell, grid, SEO | [vtl/02-themes.md](reference/vtl/02-themes.md) |
 | Write container markup | [vtl/03-containers.md](reference/vtl/03-containers.md) |
@@ -82,6 +82,9 @@ Next.js is the only framework branch here. Angular, Vue and Astro have upstream 
 | A slot renders "no component for X" | [nextjs/01-component-contract.md](reference/nextjs/01-component-contract.md) — the map key must equal the content type's Velocity variable, **case-exact** |
 | A VTL slot renders empty with no error | [vtl/05-verify-and-debug.md](reference/vtl/05-verify-and-debug.md) — errors are swallowed into an empty string with HTTP 200 |
 | A whole page is a bare shell whatever you place | `template.vtl` isn't looping `$dotThemeLayout` — [vtl/02-themes.md](reference/vtl/02-themes.md) |
+| Theme, header and footer render but every slot is missing | Either the missing layout loop above, or a hand-rolled `#parseContainer` — [vtl/02-themes.md](reference/vtl/02-themes.md) |
+| Container assembly broken | An empty `preloop.vtl` or `postloop.vtl`; they must be non-empty — [core/06-containers.md](reference/core/06-containers.md) |
+| A template's container path doesn't resolve | Paths must be host-qualified `//<site>/application/containers/<name>/` — [core/06-containers.md](reference/core/06-containers.md) |
 | Content exists but doesn't appear | Placement is a full replacement, and LIVE only changes on publish — [core/09-placement.md](reference/core/09-placement.md) |
 | A layout change didn't take effect | Re-publish the template — [core/05-templates.md](reference/core/05-templates.md) |
 | The right content renders in the wrong shape | Wrong mechanism chosen — [vtl/01-choose-mechanism.md](reference/vtl/01-choose-mechanism.md) |
