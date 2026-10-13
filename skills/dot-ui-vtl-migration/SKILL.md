@@ -12,7 +12,7 @@ For the full migration rules, all code examples, the DaisyUI styling section, an
 
 ## Migrate a whole instance
 
-When the user asks to migrate **all** custom fields, every legacy field, or "the whole instance", not a single pasted VTL file, follow [reference/instance-migration.md](reference/instance-migration.md). It uses the `dotcms` MCP server to find, download and republish the fields, and this skill to migrate each file in the default inline mode. Work in batches the customer picks, and never write to the instance without their explicit confirmation.
+When the user asks to migrate **all** custom fields, every legacy field, or "the whole instance", not a single pasted VTL file, follow [reference/instance-migration.md](reference/instance-migration.md). The `dotcms` MCP server reads and writes the instance, `scripts/vtl_migration.py` (local, no network, plain `python3`) classifies the fields and runs the safety gates, and this skill migrates each file in the default inline mode. Work in batches the customer picks, and never write to the instance without their explicit confirmation.
 
 ## The Core API Swap (Quick Reference)
 

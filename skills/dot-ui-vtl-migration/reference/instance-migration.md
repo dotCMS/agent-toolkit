@@ -1,94 +1,147 @@
 # Migrate a whole instance
 
 Use this when the user asks to migrate **all** custom fields, every legacy field, or "the whole
-instance", not a single pasted VTL file. The `dotcms` MCP server does the I/O; the agent migrates
-each file in between, in the default **inline** mode (see `SKILL.md` → Output Modes).
+instance", not a single pasted VTL file. Two parts do the work, and neither goes through the REST
+API directly:
+
+- **The `dotcms` MCP server** does all the I/O with the instance: reading content types,
+  downloading and publishing files, updating fields. Authentication belongs to the MCP server;
+  never ask for, read or write a token.
+- **`scripts/vtl_migration.py`** does the parts that must be exact: classifying fields, deciding
+  what to download, the safety gates on every migrated file, and the manifest. It makes no
+  network calls and needs only `python3` (3.9+). Run `python3 scripts/vtl_migration.py --help`.
+
+The agent migrates each file in between, in the default **inline** mode (see `SKILL.md` → Output
+Modes).
 
 Enumerate the MCP server's tools and read their descriptions; each description is the source of
-truth for how to call it. Discover endpoints by searching the spec first. Use the purpose-built
-asset-transfer tools for files, so the code never passes through your context.
+truth for how to call it. Search the spec to confirm an endpoint before calling it. Use the
+asset-transfer tool for downloads when it can reach the file.
 
 ## Ground rules
 
 - **Work in batches the customer picks.** Never migrate and publish the whole instance in one go
   unless they ask for it.
 - **Nothing is written to the instance until the customer has confirmed** the summary of changes
-  (step 5), and a dry run (step 6) has been shown.
-- **One bad item never blocks the batch.** Record it as `skipped` or `failed` with the reason,
-  and carry on.
-- **Credentials belong to the MCP server.** Never ask for, read, or write a token.
+  (step 5) and has seen a dry run (step 6).
+- **One bad item never blocks the batch.** `check` reports each entry on its own; record it and
+  carry on.
+- **Never edit `manifest.json` by hand.** Use `record`.
 
 ## Working directory
 
-Keep everything under one directory, `./vtl-migration/`, and never commit it:
+`./vtl-migration/` is the script's default `--workdir`; never commit it.
 
 ```
 vtl-migration/
-  manifest.json
-  original/assets/<id>__<fileName>     downloaded /dA/ file
-  original/fields/<Type.field>.vtl     in-field VTL
-  migrated/...                         same relative paths as original/
+  scan/part-N.json                    you write: the custom fields (step 1)
+  assets/<id>.json                    you write: metadata of each /dA/ reference (step 2)
+  original/assets/<id>__<file>        downloaded (step 2)
+  original/fields/<Type.field>.vtl    written by classify
+  migrated/...                        you write: same relative path as original/ (step 4)
+  manifest.json                       written by the script
 ```
 
-`manifest.json` is yours to maintain. One entry per thing to change:
+`manifest.json` has one entry per thing to change, each with `status` (`pending`, `published`,
+`skipped`, `failed`) and `statusReason`:
 
-| `kind` | Meaning | Key fields |
+| `kind` | Meaning | Key |
 |---|---|---|
-| `asset` | A file loaded by `#dotParse("/dA/<id>")` | `key` = identifier, `inode`, `languageId`, `contentType`, `binaryField`, `fileName`, `usedBy`, `file` |
-| `field` | VTL stored in the custom field itself | `key` = `Type.field`, `typeId`, `fieldId`, `file` |
-| `renderMode` | A field that only needs the switch to **Recommended** | `key` = `Type.field`, `typeId`, `fieldId`, `requires` (asset keys that must be published first) |
-
-Every entry has `status`: `pending`, `published`, `skipped` or `failed`, plus a `statusReason`.
-Record the instance URL in the manifest; if it differs from the instance the MCP server is
-connected to now, stop and ask.
+| `asset` | A file loaded by `#dotParse("/dA/<id>")` | the identifier |
+| `field` | VTL stored in the custom field itself | `Type.field` |
+| `renderMode` | A field to switch to **Recommended**; `requires` lists the assets to publish first | `Type.field` |
 
 ## 1. Discover
 
-List every content type, then fetch each one in full. Look only at fields whose class is
-`com.dotcms.contenttype.model.field.ImmutableCustomField`, and read the field's `values` (its
-VTL). Classify each field, in this order:
+Read every content type's custom fields through the MCP server, and write them to
+`vtl-migration/scan/part-N.json` as arrays of records. This snippet (run with the MCP
+`execute` tool) returns one slice of the content types; call it again with the next `start` until
+`done` is true, and shrink `count` if the output is cut off:
 
-| Finding in `values` | Category | Action |
+```js
+const start = 0, count = 25;
+const CUSTOM = 'com.dotcms.contenttype.model.field.ImmutableCustomField';
+const out = [];
+for (const t of contentTypes.slice(start, start + count)) {
+  const res = await api.request({ method: 'GET', path: `/api/v1/contenttype/id/${t.id}` });
+  for (const f of res.entity.fields || []) {
+    if (f.clazz !== CUSTOM) continue;
+    out.push({
+      type: t.variable, typeId: t.id, field: f.variable, fieldId: f.id,
+      values: f.values || '',
+      component: (f.fieldVariables || []).some(v => v.key === 'newRenderMode' && v.value === 'component'),
+    });
+  }
+}
+return { done: start + count >= contentTypes.length, records: out };
+```
+
+Write each slice's `records` array to its own file in `scan/`, then:
+
+```bash
+python3 scripts/vtl_migration.py classify
+```
+
+`classify` sorts every custom field and prints counts, the `/dA/` ids to resolve
+(`assetsToResolve`) and the report-only buckets:
+
+| Finding in `values` | Category | What happens |
 |---|---|---|
-| One or more `#dotParse("/dA/<id>")` | Downloadable file | Resolve it (below); queue if legacy |
+| One or more `#dotParse("/dA/<id>")` | Downloadable file | Resolved in step 2; queued if legacy |
 | `#dotParse` of any other path | Unhandled path | Report only |
 | `$velutil.mergeTemplate('...')` or `#parse('...')` | Core-shipped file | Report only; the file ships inside dotCMS |
-| Contains `isNewEditModeEnabled` | Already migrated | Report only; queue a `renderMode` entry if the field is not in Recommended mode |
-| Contains `dojo.`, `dijit`, `dojoType` or `DotCustomFieldApi.get/set/onChangeField(` | In-field legacy VTL | Queue as a `field` entry |
+| Contains `isNewEditModeEnabled` | Already migrated | Report only; a `renderMode` entry is queued if the field is not in Recommended mode |
+| Contains `dojo.`, `dijit`, `dojoType` or `DotCustomFieldApi.get/set/onChangeField(` | In-field legacy VTL | Written to `original/fields/` and queued as a `field` entry |
 | None of the above | Already fine | Nothing to do |
 
-Resolving a `/dA/<id>` reference: `GET /api/v1/content/<id>`.
+## 2. Resolve and download the files
 
-- No content, or no binary field (`asset`, `fileAsset`, or the variable before `ContentAsset`
-  in the response) → **unresolved**, report it.
-- The returned `identifier` differs from `<id>` → the field **pins a specific version** (an
-  inode). Report only; publishing always lands on the latest version of the identifier, so this
-  cannot be migrated safely. Tell the customer to point the field at the identifier.
-- The file already contains `isNewEditModeEnabled` → already migrated, report only.
-- No file name (`fileName`, `name`, `title`) → unresolved.
-- Otherwise queue an `asset` entry. Note when the content is not `live`.
+For every id in `assetsToResolve`, fetch the content's metadata and write it to
+`assets/<id>.json`:
 
-A `renderMode` entry is queued for a field that is not yet in Recommended mode (no field
-variable `newRenderMode` = `component`) when its code is, or after publishing will be,
-migrated: owners of a queued or already-migrated `/dA/` asset (list the queued assets in
-`requires`), and fields whose inline code already carries the switch. Skip a field that also
-uses an unhandled path, an unresolved asset or a pinned version: flagging it would switch
-unmigrated code to the new editor. An in-field legacy entry needs no `renderMode` entry; the
-flag goes in the same update as its code.
+```js
+const ids = ['<id>', '<id>'];
+const out = {};
+for (const id of ids) {
+  const res = await api.request({ method: 'GET', path: `/api/v1/content/${id}` });
+  const c = res.entity;
+  if (!c) { out[id] = null; continue; }
+  const bin = ['asset', 'fileAsset'].find(k => `${k}ContentAsset` in c)
+    || Object.keys(c).find(k => k.endsWith('ContentAsset'))?.replace(/ContentAsset$/, '');
+  out[id] = {
+    identifier: c.identifier, inode: c.inode, languageId: c.languageId, contentType: c.contentType,
+    live: c.live, fileName: c.fileName, name: c.name, title: c.title, binaryField: bin,
+    path: c.path, hostName: c.hostName,
+  };
+}
+return out;
+```
 
-## 2. Download
+A `null` or an id without a usable result gets no file; the script reports it as unresolved.
+Then:
 
-Download each queued `asset` into `original/assets/` with the asset-download tool. It takes a
-dotCMS path, so resolve the identifier to a path first (the content's `path`/`url` and its
-host). Write each in-field VTL to `original/fields/` exactly as stored. Record `inode` (assets)
-or keep the original text (fields): these are your conflict check in step 6.
+```bash
+python3 scripts/vtl_migration.py assets-plan
+```
 
-Re-running discovery after a publish should not download again what is already migrated: when an
-asset's current `inode` equals the one recorded as migrated, skip the download.
+It prints `toDownload` (each with its `destination` path and the dotCMS `path`/`hostName` to
+fetch), plus `pinned` (the field points at an inode, not the identifier: report only, because
+publishing always lands on the latest version), `unresolved` and `alreadyMigrated`. Download each
+`toDownload` file to its `destination` with the asset-download tool. If the tool cannot reach the
+file by path, read it with `GET /api/v1/content/<id>`'s `<binaryField>Version` URL through
+`execute` (the response is a base64 envelope) and write the decoded bytes. Then:
+
+```bash
+python3 scripts/vtl_migration.py build-manifest --instance <host>
+```
+
+This builds `manifest.json` (a downloaded file that already has `isNewEditModeEnabled` counts as
+already migrated) and prints the counts, the entries and the report-only buckets. Re-running
+steps 1-2 after a publish does not download again a file that is already migrated.
 
 ## 3. Show what's pending and let the customer pick
 
-One numbered table, nothing migrated yet:
+Build one numbered table from `build-manifest`'s `entries` (or `status`), nothing migrated yet:
 
 | # | VTL | Kind | Used by |
 |---|---|---|---|
@@ -96,15 +149,15 @@ One numbered table, nothing migrated yet:
 | 2 | `Banner.widget` | inline field | `Banner.widget` |
 
 List `renderMode` entries with an empty `requires` as one extra row ("Switch to Recommended
-only: …"). Do not list those with `requires`: they go along with their asset. Sum up report-only
-buckets in one line of counts ("25 load core files, 3 use unhandled paths, say *details* to see
-them"). Ask which rows to do now: `all`, row numbers (`1,3`) or `none`, and wait.
+only: …"). Do not list those with `requires`: they go along with their asset. Sum up the
+report-only buckets in one line of counts ("25 load core files, 3 use unhandled paths, say
+*details* to see them"). Ask which rows to do now: `all`, row numbers (`1,3`) or `none`, and wait.
 
 ## 4. Migrate the selected files
 
 Migrate each selected file in `original/` in the default inline mode and write the result to
-`migrated/` under the same relative path. When assembling the file, copy the legacy bytes with
-the shell recipe in `SKILL.md` (Mode 1); never retype them.
+`migrated/` under the same relative path. Assemble the file with the shell recipe in `SKILL.md`
+(Mode 1) so the legacy bytes are copied, never retyped.
 
 ## 5. Confirm
 
@@ -113,46 +166,91 @@ instance.
 
 ## 6. Dry run, then publish only that batch
 
-Process entries in manifest order, so assets come before the `renderMode` entries that depend on
-them. For each selected entry, run the checks, and with a dry run report the outcome without
-writing. Show the dry run, then repeat it for real.
+Pass the selected rows' keys (the dA id for a file, `Type.field` for an inline field or a switch).
 
-**Per-entry checks (all must pass, otherwise `skipped` with the reason):**
+```bash
+python3 scripts/vtl_migration.py check --dry-run --only <key...>
+```
 
-1. **Unchanged since download.** Re-read it now. An asset: `GET /api/v1/content/<identifier>`
-   and its `inode` equals the recorded one. A field:
-   `GET /api/v1/contenttype/<typeId>/fields/id/<fieldId>` and its `values` equal the original
-   text byte for byte.
-2. **Genuine inline migration.** The migrated file starts with
-   `#if( $structures.isNewEditModeEnabled() )` on line 1, and the text after the top-level
-   `#else` up to the final `#end` is the original, verbatim. Also pass the "Before emitting
-   inline" checks in `SKILL.md`. A migrated file that fails is skipped, never "fixed" here.
-3. **Dependencies met** (`renderMode`): every asset in `requires` is `published`, or the entry
-   is `waiting` and stays `pending`.
+`check` runs the gates and gives a verdict per entry. Show it to the customer, then run it again
+without `--dry-run` (that also records the `skipped` ones):
 
-**Writes:**
+| Verdict | Meaning | What you do |
+|---|---|---|
+| `ready` | Every gate passed; `action` says what to publish | Write it to the instance (below), then `record` |
+| `skipped` | A gate failed (`reason`): the migrated file is identical to the original, is not an inline migration, or does not keep the original verbatim behind the switch | Report it; fix the migration and `check --retry`, or leave it |
+| `waiting` | No migrated file yet, or an asset it depends on is not published yet | Stays pending |
+| `done` | Already finished; named again only with `--retry` | Nothing |
 
-- **`asset`**: fire the `PUBLISH` workflow action on the existing identifier with the migrated
-  file as the binary field (multipart: a `json` part with `contentlet.contentType`,
-  `contentlet.identifier` and `binaryFields: [<binaryField>]`, and the file under its original
-  `fileName`), with `language` = the entry's `languageId` and `indexPolicy=WAIT_FOR`. The
-  identifier must stay the same, so `#dotParse("/dA/<id>")` keeps working. Take the new `inode`
-  from the response; if it cannot be read, report `failed` and ask the customer to verify, never
-  `published`.
-- **`field`**: save the full field with the migrated `values` **and** `newRenderMode` =
-  `component` in one `PUT /api/v3/contenttype/<typeId>/fields/<fieldId>` (body
-  `{ "field": <full field> }`). The v3 update rebuilds the field and replaces the variables list
-  wholesale, so send the field exactly as fetched, with every other field variable kept; an
-  omitted variable is deleted. Keep the existing `newRenderMode` variable's id if there is one.
-- **`renderMode`**: the same v3 update, changing only that variable. Skip if already
-  `component`.
+Selecting an asset also selects the fields that load it, so they switch to Recommended in the same
+run. Their entries are `waiting` until the asset is `published` in the manifest: publish the assets
+first, `record` them, and run `check --only <same keys>` again to unlock the switches.
 
-A migrated field only renders natively in the new editor once it is in Recommended mode.
+For each `ready` entry, in order, run the matching write with the MCP `execute` tool, then record
+the outcome **immediately** so an interrupted run leaves an accurate manifest. Run
+`python3 scripts/vtl_migration.py payload <key>` to get the values to embed (as JSON literals).
+
+**`publish-asset`.** Check nothing changed since the download, then fire PUBLISH on the existing
+identifier with the migrated file, so `#dotParse("/dA/<id>")` keeps working:
+
+```js
+const p = /* paste the output of `payload <key>` */;
+const current = (await api.request({ method: 'GET', path: `/api/v1/content/${p.identifier}` })).entity;
+if (!current || current.inode !== p.expectedInode) {
+  return { outcome: 'skipped', reason: 'changed on the server since download' };
+}
+const res = await api.request({
+  method: 'PUT',
+  path: '/api/v1/workflow/actions/default/fire/PUBLISH',
+  query: { identifier: p.identifier, language: p.languageId, indexPolicy: 'WAIT_FOR' },
+  formData: {
+    json: JSON.stringify({ contentlet: { contentType: p.contentType, identifier: p.identifier }, binaryFields: [p.binaryField] }),
+    file: { name: p.fileName, type: 'text/plain', data: p.contentBase64 },
+  },
+});
+const inode = res && res.entity && res.entity.inode;
+return inode ? { outcome: 'published', inode } : { outcome: 'failed', reason: 'published but the response had no inode; verify manually' };
+```
+
+Then `record <key> --status published --inode <inode>`, or `--status skipped|failed --reason "..."`.
+If the inode could not be read, record `failed`, never `published`.
+
+**`update-field`.** Save the migrated code **and** `newRenderMode` = `component` in one update. The
+v3 update rebuilds the field and replaces the variables list wholesale, so send the field exactly as
+fetched with every other variable kept:
+
+```js
+const p = /* paste the output of `payload <key>` */;
+const url = `/api/v1/contenttype/${p.typeId}/fields/id/${p.fieldId}`;
+const field = (await api.request({ method: 'GET', path: url })).entity;
+if (!field || (field.values || '') !== p.original) {
+  return { outcome: 'skipped', reason: 'changed on the server since download' };
+}
+const vars = field.fieldVariables || [];
+const existing = vars.find(v => v.key === 'newRenderMode') || {};
+const flag = { ...existing, clazz: 'com.dotcms.contenttype.model.field.ImmutableFieldVariable',
+               key: 'newRenderMode', value: 'component', fieldId: field.id };
+const updated = { ...field, values: p.migrated, fieldVariables: [...vars.filter(v => v.key !== 'newRenderMode'), flag] };
+await api.request({ method: 'PUT', path: `/api/v3/contenttype/${p.typeId}/fields/${p.fieldId}`, body: { field: updated } });
+return { outcome: 'published' };
+```
+
+**`set-render-mode`.** The same update without changing `values`: skip if the field already has
+`newRenderMode` = `component`, otherwise send it with only that variable changed.
+
+Treat any request error as `failed` for that entry and carry on with the rest of the batch.
 
 ## 7. Report and offer the next batch
 
-Say what was published, skipped (and why), failed or is waiting, name the fields that were
-switched to Recommended, then show what is still `pending` and ask whether to continue.
-Unselected rows stay pending; nothing is lost by stopping. Never re-publish an entry that already
-finished (`published`, `skipped`, `failed`) unless the customer names it to retry. In a later
-session start again from step 1: discovery lists only what is left.
+```bash
+python3 scripts/vtl_migration.py status
+```
+
+Say what was published, skipped (and why), failed or is waiting, name the fields that were switched
+to Recommended, then show what is still `pending` and ask whether to continue. Unselected rows stay
+pending; nothing is lost by stopping. Entries that finished are not reprocessed unless the customer
+names one to retry (`check --retry`). In a later session start again from step 1: the manifest
+remembers which files are already migrated, so only what is left is downloaded.
+
+A migrated field only renders natively in the new editor once it is in the **Recommended**
+implementation (`newRenderMode` = `component`).
