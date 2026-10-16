@@ -11,7 +11,8 @@ exact and are easy to get wrong by hand, with no network and no credentials:
   build-manifest  Build manifest.json from the downloaded files.
   status          List the manifest entries (what is pending, what is done).
   check           Run the safety gates on the migrated files and say what is ready to publish.
-  payload         Print what the agent needs to publish one entry.
+  payload         Print what the agent needs to publish one asset.
+  field-body      Build the PUT body for a field update or a render-mode switch.
   record          Persist one entry's outcome in the manifest, right after the write.
 
 Working directory layout (default ./vtl-migration, standard library only, Python 3.9+):
@@ -27,8 +28,11 @@ Every command prints one JSON document on stdout. Exit codes: 0 success, 2 inval
 arguments or missing/corrupt input.
 """
 
+from __future__ import annotations
+
 import argparse
 import base64
+import copy
 import json
 import os
 import re
@@ -230,6 +234,7 @@ def cmd_classify(workdir: Path) -> dict:
     write_json(workdir / "scan-result.json", scan.to_json())
     return {
         "command": "classify",
+        "scanParts": len(parts),
         "counts": {
             "customFields": len(seen),
             "assetReferences": len(scan.asset_refs),
@@ -276,7 +281,11 @@ def cmd_assets_plan(workdir: Path) -> dict:
     for da_id, owners in scan.asset_refs.items():
         used_by = ", ".join(owners)
         meta_path = workdir / "assets" / f"{da_id}.json"
-        meta = read_json(meta_path) if meta_path.exists() else None
+        try:
+            meta = read_json(meta_path) if meta_path.exists() else None
+        except InputError as e:
+            unresolved.append(f"{da_id} ({e}, used by {used_by})")
+            continue
         if not meta or not meta.get("binaryField") or not meta.get("identifier") or not meta.get("inode"):
             unresolved.append(f"{da_id} (no usable content metadata, used by {used_by})")
             continue
@@ -363,6 +372,21 @@ def render_mode_entries(scan: Scan, queued_assets: set[str], migrated_assets: se
     return entries
 
 
+def carry_over_progress(entries: list[dict], previous: dict) -> None:
+    """A rebuild must not undo work: copy status, reason and previousInode from the previous
+    manifest's entry with the same key and kind. An entry that no longer shows up (a field
+    already published is now classified as migrated) is simply dropped."""
+    earlier = {(e["kind"], e["key"]): e for e in previous.get("entries", [])}
+    for entry in entries:
+        old = earlier.get((entry["kind"], entry["key"]))
+        if not old:
+            continue
+        entry["status"] = old.get("status", entry["status"])
+        entry["statusReason"] = old.get("statusReason")
+        if old.get("previousInode"):
+            entry["previousInode"] = old["previousInode"]
+
+
 def cmd_build_manifest(workdir: Path, instance: str | None) -> dict:
     """Reads scan-result.json, assets-plan.json and the downloaded files, writes manifest.json."""
     scan = Scan.from_json(read_json(workdir / "scan-result.json"))
@@ -379,7 +403,11 @@ def cmd_build_manifest(workdir: Path, instance: str | None) -> dict:
 
     for item in plan["toDownload"]:
         da_id = item["id"]
-        meta = read_json(workdir / "assets" / f"{da_id}.json")
+        try:
+            meta = read_json(workdir / "assets" / f"{da_id}.json")
+        except InputError as e:
+            unresolved.append(f"{da_id} ({e}, used by {', '.join(item['usedBy'])})")
+            continue
         downloaded = original_dir / item["file"]
         label = f"{meta.get('contentType')} {item['fileName']} ({da_id})"
         if not downloaded.is_file():
@@ -419,6 +447,7 @@ def cmd_build_manifest(workdir: Path, instance: str | None) -> dict:
     migration_entries = list(entries)
     entries.extend(flags)  # after the assets they may depend on: check processes in order
 
+    carry_over_progress(entries, previous)
     manifest = {
         "instance": instance,
         "builtAt": datetime.now().isoformat(),
@@ -457,6 +486,11 @@ def cmd_build_manifest(workdir: Path, instance: str | None) -> dict:
 _INLINE_HEADER_RE = re.compile(rb"^#if\(\s*\$structures\.isNewEditModeEnabled\(\)\s*\)")
 _DIRECTIVE_NAME_RE = re.compile(rb"[A-Za-z0-9_@]+")
 _BLOCK_OPENERS = {b"if", b"foreach", b"macro", b"define", b"literal"}
+
+
+# The inline-validity logic below (_iter_directives, locate_top_level_else, inline_problem) is
+# copied from dotCMS/core's migrate_custom_fields.py and mirrors the "Before emitting inline" and
+# "Converting between modes" rules in SKILL.md and reference/migration-guide.md. Change them together.
 
 
 def _iter_directives(data: bytes):
@@ -574,6 +608,70 @@ def inline_problem(original: bytes, migrated: bytes) -> str | None:
     return None
 
 
+# ─── field-body ──────────────────────────────────────────────────────────
+
+RENDER_MODE_KEY = "newRenderMode"
+RENDER_MODE_COMPONENT = "component"
+FIELD_VARIABLE_CLAZZ = "com.dotcms.contenttype.model.field.ImmutableFieldVariable"
+
+
+def has_component_render_mode(field: dict) -> bool:
+    return any(
+        v.get("key") == RENDER_MODE_KEY and v.get("value") == RENDER_MODE_COMPONENT
+        for v in field.get("fieldVariables") or []
+    )
+
+
+def with_component_render_mode(field: dict) -> dict:
+    """A copy of `field` whose `newRenderMode` variable is "component". Every other field
+    variable is kept as-is: the v3 field PUT replaces the variables list wholesale, so any
+    variable left out would be deleted. An existing `newRenderMode` keeps its id."""
+    updated = copy.deepcopy(field)
+    variables = updated.get("fieldVariables") or []
+    existing = next((v for v in variables if v.get("key") == RENDER_MODE_KEY), {})
+    flag = {
+        **existing,
+        "clazz": FIELD_VARIABLE_CLAZZ,
+        "key": RENDER_MODE_KEY,
+        "value": RENDER_MODE_COMPONENT,
+        "fieldId": field.get("id"),
+    }
+    updated["fieldVariables"] = [v for v in variables if v.get("key") != RENDER_MODE_KEY] + [flag]
+    return updated
+
+
+def cmd_field_body(workdir: Path, key: str, field_file: Path) -> dict:
+    """Builds the body of `PUT /api/v3/contenttype/{typeId}/fields/{fieldId}` from the field
+    as the agent just fetched it (`field_file`). For a `field` entry it first checks the field
+    still holds the original text, then sets the migrated code; for a `renderMode` entry it
+    only switches the render mode. Either way `newRenderMode` ends as "component" and every
+    other field variable is kept. Returns a verdict: ok (with `body`) or skipped (with `reason`)."""
+    manifest = read_manifest(workdir)
+    entry = find_entry(manifest, key)
+    if entry["kind"] == "asset":
+        raise InputError(f"{entry['key']} is an asset; field-body is for fields and render-mode switches")
+    field = read_json(field_file)
+    if not isinstance(field, dict) or not field.get("id"):
+        raise InputError(f"{field_file} must hold the field object as fetched (with its id)")
+
+    if entry["kind"] == "field":
+        migrated = workdir / "migrated" / entry["file"]
+        original = workdir / "original" / entry["file"]
+        if not migrated.exists() or not original.exists():
+            raise InputError(f"missing the original or migrated file for {entry['key']}")
+        if (field.get("values") or "") != original.read_text():
+            return {"command": "field-body", "key": entry["key"], "verdict": "skipped",
+                    "reason": "changed on the server since download"}
+        updated = with_component_render_mode(field)
+        updated["values"] = migrated.read_text()
+    else:
+        if has_component_render_mode(field):
+            return {"command": "field-body", "key": entry["key"], "verdict": "skipped",
+                    "reason": "already in component render mode"}
+        updated = with_component_render_mode(field)
+    return {"command": "field-body", "key": entry["key"], "verdict": "ok", "body": {"field": updated}}
+
+
 # ─── check / payload / record / status ───────────────────────────────────
 
 
@@ -610,6 +708,8 @@ def gate_file_entry(workdir: Path, entry: dict) -> tuple[str, str | None]:
     original_file = workdir / "original" / entry["file"]
     if not migrated_file.exists():
         return "waiting", "no migrated file yet"
+    if not original_file.exists():
+        raise InputError(f"missing {original_file}: re-run classify and build-manifest")
     migrated, original = migrated_file.read_bytes(), original_file.read_bytes()
     if migrated == original:
         return "skipped", "migrated file is identical to original"
@@ -690,8 +790,7 @@ def find_entry(manifest: dict, key: str) -> dict:
 
 def cmd_payload(workdir: Path, key: str) -> dict:
     """What the agent needs to publish one entry. For an asset: the migrated file as base64
-    (small VTL files). For a field: the original and migrated text, for the conflict check
-    and the update. A render-mode entry needs only its ids."""
+    (small VTL files). A field or render-mode entry needs only its ids: use `field-body`."""
     manifest = read_manifest(workdir)
     entry = find_entry(manifest, key)
     out = {"command": "payload", "key": entry["key"], "kind": entry["kind"], **action_for(entry)}
@@ -703,16 +802,14 @@ def cmd_payload(workdir: Path, key: str) -> dict:
         raise InputError(f"no migrated file at {migrated}")
     if entry["kind"] == "asset":
         out["contentBase64"] = base64.b64encode(migrated.read_bytes()).decode("ascii")
-    else:
-        out["original"] = original.read_text()
-        out["migrated"] = migrated.read_text()
     return out
 
 
 def record_status(workdir: Path, manifest: dict, key: str, status: str, reason: str | None) -> None:
     """Updates one entry and immediately persists the whole manifest, so an interrupted batch
     still leaves an accurate record of what happened to each entry attempted so far."""
-    assert status in MANIFEST_STATUSES, f"unknown status {status!r}"
+    if status not in MANIFEST_STATUSES:
+        raise InputError(f"unknown status {status!r}")
     for entry in manifest["entries"]:
         if entry["key"] == key:
             entry["status"] = status
@@ -766,6 +863,9 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--only", nargs="+", default=[], metavar="KEY", help="dA ids, identifiers or Type.field")
     check.add_argument("--dry-run", action="store_true", help="do not record skipped entries")
     check.add_argument("--retry", action="store_true", help="re-check entries that already finished")
+    body = sub.add_parser("field-body", help="build the PUT body for a field or render-mode switch")
+    body.add_argument("key")
+    body.add_argument("--field-file", required=True, type=Path, help="the field as just fetched, as JSON")
     payload = sub.add_parser("payload", help="print what is needed to publish one entry")
     payload.add_argument("key")
     record = sub.add_parser("record", help="persist the outcome of one write")
@@ -786,6 +886,8 @@ def main(argv: list[str] | None = None) -> int:
             result = cmd_status(args.workdir)
         elif args.command == "check":
             result = cmd_check(args.workdir, args.only, args.dry_run, args.retry)
+        elif args.command == "field-body":
+            result = cmd_field_body(args.workdir, args.key, args.field_file)
         elif args.command == "payload":
             result = cmd_payload(args.workdir, args.key)
         else:

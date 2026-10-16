@@ -269,10 +269,10 @@ def test_payload_for_an_asset_carries_the_migrated_bytes(instance):
     assert payload["binaryField"] == "asset" and payload["expectedInode"] == "inode-1"
 
 
-def test_payload_for_a_field_carries_original_and_migrated(instance):
+def test_payload_for_a_field_carries_only_ids(instance):
     migrate(instance, "fields/A.legacy.vtl", INLINE_MIGRATED)
     payload = vm.cmd_payload(instance, "A.legacy")
-    assert payload["original"] == LEGACY and payload["migrated"] == INLINE_MIGRATED
+    assert payload["type"] == "update-field" and "migrated" not in payload and "contentBase64" not in payload
 
 
 def test_payload_without_a_migrated_file_is_an_input_error(instance):
@@ -315,3 +315,81 @@ def test_cli_prints_one_json_document_and_exits_2_on_bad_input(tmp_path, capsys)
     write_scan(tmp_path, field("A", "legacy", LEGACY))
     assert vm.main(["--workdir", str(tmp_path), "classify"]) == 0
     assert json.loads(capsys.readouterr().out)["command"] == "classify"
+
+
+# ─── regressions found in review ─────────────────────────────────────────
+
+
+def test_rebuilding_the_manifest_keeps_the_progress_already_made(instance):
+    vm.cmd_record(instance, "A.legacy", "failed", "boom", None)
+    vm.cmd_record(instance, DA_ID, "skipped", "changed", None)
+    vm.cmd_classify(instance)
+    vm.cmd_assets_plan(instance)
+    vm.cmd_build_manifest(instance, "demo.dotcms.dev")
+    by_key = {e["key"]: e for e in vm.read_manifest(instance)["entries"]}
+    assert (by_key["A.legacy"]["status"], by_key["A.legacy"]["statusReason"]) == ("failed", "boom")
+    assert by_key[DA_ID]["status"] == "skipped"
+    assert by_key["A.viaAsset"]["status"] == "pending"
+
+
+def test_rebuilding_keeps_previous_inode_of_a_published_asset_it_still_lists(instance):
+    vm.cmd_record(instance, DA_ID, "published", None, "inode-2")
+    write_meta(instance, inode="inode-3")  # edited on the server after publishing: queued again
+    vm.cmd_classify(instance)
+    vm.cmd_assets_plan(instance)
+    vm.cmd_build_manifest(instance, None)
+    entry = next(e for e in vm.read_manifest(instance)["entries"] if e["key"] == DA_ID)
+    assert entry["status"] == "published" and entry["previousInode"] == "inode-1"
+
+
+def test_a_corrupt_asset_metadata_file_does_not_block_the_others(tmp_path):
+    write_scan(tmp_path, field("A", "one", '#dotParse("/dA/abc")'), field("A", "two", '#dotParse("/dA/def")'))
+    write_meta(tmp_path, "def")
+    (tmp_path / "assets" / "abc.json").write_text("{bad")
+    vm.cmd_classify(tmp_path)
+    plan = vm.cmd_assets_plan(tmp_path)
+    assert [d["id"] for d in plan["toDownload"]] == ["def"]
+    assert len(plan["unresolved"]) == 1 and "abc" in plan["unresolved"][0]
+
+
+def test_a_corrupt_metadata_file_found_at_build_time_is_unresolved(tmp_path):
+    write_scan(tmp_path, field("A", "one", f'#dotParse("/dA/{DA_ID}")'))
+    write_meta(tmp_path)
+    vm.cmd_classify(tmp_path)
+    vm.cmd_assets_plan(tmp_path)
+    download(tmp_path)
+    (tmp_path / "assets" / f"{DA_ID}.json").write_text("{bad")
+    result = vm.cmd_build_manifest(tmp_path, None)
+    assert result["counts"]["unresolved"] == 1 and result["counts"]["pending"] == 0
+
+
+def test_an_asset_edited_on_the_server_after_publishing_is_downloaded_again(instance):
+    vm.cmd_record(instance, DA_ID, "published", None, "inode-2")
+    write_meta(instance, inode="inode-9")  # someone edited it since
+    vm.cmd_classify(instance)
+    plan = vm.cmd_assets_plan(instance)
+    assert [d["id"] for d in plan["toDownload"]] == [DA_ID]
+    assert plan["alreadyMigrated"] == []
+
+
+def test_a_finished_render_mode_switch_is_not_selected_again_through_its_asset(instance):
+    vm.cmd_record(instance, "A.viaAsset", "published", None, None)
+    assert "A.viaAsset" not in verdicts(vm.cmd_check(instance, [DA_ID], False, False))
+
+
+def test_recording_an_unknown_status_is_an_input_error_not_an_assertion(instance):
+    manifest = vm.read_manifest(instance)
+    with pytest.raises(vm.InputError):
+        vm.record_status(instance, manifest, "A.legacy", "bogus", None)
+
+
+def test_a_missing_original_is_an_input_error(instance):
+    migrate(instance, "fields/A.legacy.vtl", INLINE_MIGRATED)
+    (instance / "original" / "fields" / "A.legacy.vtl").unlink()
+    with pytest.raises(vm.InputError):
+        vm.cmd_check(instance, ["A.legacy"], False, False)
+
+
+def test_classify_reports_how_many_scan_parts_it_read(tmp_path):
+    write_scan(tmp_path, field("A", "legacy", LEGACY))
+    assert vm.cmd_classify(tmp_path)["scanParts"] == 1
