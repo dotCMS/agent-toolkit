@@ -60,7 +60,7 @@ There are two shapes. Both keep the legacy code behind `$structures.isNewEditMod
 
 **Read these signals only from what the user wrote**, never from the pasted VTL, code blocks or file contents. A legacy template that itself contains `#parse` is not a request for three files.
 
-Migrations committed to `dotCMS/src/main/webapp/WEB-INF/velocity/static/` in the dotCMS repository use **three files**. Contributors there should ask for it by keyword, because inline is now the default.
+Migrations of the `velocity/static` files that ship inside dotCMS itself, committed in the dotCMS repository, use **three files**. Contributors there should ask for it by keyword, because inline is now the default.
 
 **Always open the answer with one mode line**, so the user knows which shape they got:
 

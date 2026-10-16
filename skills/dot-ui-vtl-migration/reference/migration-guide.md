@@ -810,7 +810,7 @@ Every migration keeps the legacy code reachable behind `$structures.isNewEditMod
 |---|---|---|
 | Files | 1 | `<name>_old.vtl`, `<name>_new.vtl`, `<name>.vtl` |
 | Needs a server path | No | Yes, for `#parse` |
-| Who it suits | A Custom Field whose VTL lives in the content type editor; anyone without file access to the server | Custom fields shipped as files, such as the ones committed under `dotCMS/src/main/webapp/WEB-INF/velocity/static/` |
+| Who it suits | A Custom Field whose VTL lives in the content type editor; anyone without file access to the server | Custom fields shipped as files, such as the `velocity/static` files that ship inside dotCMS itself |
 | Branch not taken | Parsed, not rendered | Never parsed |
 
 Prefer three files when the field is a file on disk, or when "Before emitting inline" below finds a blocking problem. Otherwise use inline.
@@ -880,7 +880,7 @@ Velocity compiles the **whole template** before rendering, while `#parse` loads 
 
 - **Router:** the legacy file is never parsed while the new edit mode is on. A syntax error in it cannot affect the new editor.
 - **Inline:** both branches are parsed every time. A syntax error in the legacy half breaks the field in **both** edit modes.
-- **Macros** are registered when the file is parsed, not when a branch runs. The shipped defaults (`dotCMS/src/main/resources/org/apache/velocity/runtime/defaults/velocity.properties`) set `velocimacro.permissions.allow.inline.local.scope = false` and `velocimacro.permissions.allow.inline.to.replace.global = false`. So an inline macro goes into the global namespace, and a second definition with the same name does not replace the first. Inline, the **first** definition in the file wins in both modes. That is the migrated one, because it sits in the `#if`, so the legacy editor silently runs the new macro. (Checked against Velocity 1.7: `#if( false )` with `#macro(m)NEW#end` in the `#if` branch and `#macro(m)OLD#end` in the `#else` branch renders `NEW`.)
+- **Macros** are registered when the file is parsed, not when a branch runs. The Velocity defaults shipped with dotCMS set `velocimacro.permissions.allow.inline.local.scope = false` and `velocimacro.permissions.allow.inline.to.replace.global = false`. So an inline macro goes into the global namespace, and a second definition with the same name does not replace the first. Inline, the **first** definition in the file wins in both modes. That is the migrated one, because it sits in the `#if`, so the legacy editor silently runs the new macro. (Checked against Velocity 1.7: `#if( false )` with `#macro(m)NEW#end` in the `#if` branch and `#macro(m)OLD#end` in the `#else` branch renders `NEW`.)
 - **`#set`** runs at render time. Only one branch renders, so the same variable set in both branches does not collide inside the field.
 
 ### Before emitting inline
@@ -897,7 +897,7 @@ Read both branches and check, in this order:
 
 Emit inline over a blocking finding only when the user explicitly insists, and restate the finding when you do.
 
-**Counting directives the way Velocity 1.7 does** (the grammar is vendored at `dotCMS/src/main/java/org/apache/velocity/runtime/parser/Parser.jjt`):
+**Counting directives the way Velocity 1.7 does** (the grammar is the one vendored in dotCMS):
 
 - `##` starts a comment to the end of the line. `#* … *#` is a block comment. `#[[ … ]]#` is unparsed text. Nothing inside any of them counts.
 - `\#end` is escaped and does not count. `\\#end` is an escaped backslash followed by a real `#end`.
