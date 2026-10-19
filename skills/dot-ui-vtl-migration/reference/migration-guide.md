@@ -692,7 +692,7 @@ Whenever you apply styles in a migrated custom field, use **DaisyUI component cl
     <h3 class="font-bold text-lg">Title</h3>
     <div class="modal-action">
       <form method="dialog">
-        <button type="button" class="btn btn-primary">OK</button>
+        <button type="submit" class="btn btn-primary">OK</button>
       </form>
     </div>
   </div>
