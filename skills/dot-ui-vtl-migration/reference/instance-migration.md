@@ -10,6 +10,8 @@ API directly:
 - **`scripts/vtl_migration.py`** does the parts that must be exact: classifying fields, deciding
   what to download, the safety gates on every migrated file, and the manifest. It makes no
   network calls and needs only `python3` (3.9 or newer). Run `python3 scripts/vtl_migration.py --help`.
+  It is specific to this migration, so it lives in the skill and not in the MCP server, and it
+  never reads or writes the instance: it only reads and writes files in `vtl-migration/`.
 
 The agent migrates each file in between, in the default **inline** mode (see `SKILL.md` → Output
 Modes).

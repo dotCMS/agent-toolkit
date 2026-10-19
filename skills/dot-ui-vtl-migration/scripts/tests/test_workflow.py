@@ -332,14 +332,64 @@ def test_rebuilding_the_manifest_keeps_the_progress_already_made(instance):
     assert by_key["A.viaAsset"]["status"] == "pending"
 
 
-def test_rebuilding_keeps_previous_inode_of_a_published_asset_it_still_lists(instance):
+def test_a_new_version_of_a_published_asset_starts_over_as_pending(instance):
     vm.cmd_record(instance, DA_ID, "published", None, "inode-2")
     write_meta(instance, inode="inode-3")  # edited on the server after publishing: queued again
     vm.cmd_classify(instance)
     vm.cmd_assets_plan(instance)
+    download(instance)
     vm.cmd_build_manifest(instance, None)
     entry = next(e for e in vm.read_manifest(instance)["entries"] if e["key"] == DA_ID)
-    assert entry["status"] == "published" and entry["previousInode"] == "inode-1"
+    assert entry["inode"] == "inode-3" and entry["status"] == "pending"
+    assert "previousInode" not in entry
+
+
+def test_a_skipped_asset_keeps_its_status_while_the_inode_is_unchanged(instance):
+    vm.cmd_record(instance, DA_ID, "skipped", "changed", None)
+    vm.cmd_classify(instance)
+    vm.cmd_assets_plan(instance)
+    vm.cmd_build_manifest(instance, None)
+    entry = next(e for e in vm.read_manifest(instance)["entries"] if e["key"] == DA_ID)
+    assert entry["status"] == "skipped"
+
+
+def test_a_legacy_field_that_only_mentions_the_marker_is_still_migrated(tmp_path):
+    mention = LEGACY + "\n// later: $structures.isNewEditModeEnabled()"
+    write_scan(tmp_path, field("A", "legacy", mention))
+    result = vm.cmd_classify(tmp_path)
+    assert result["counts"]["inlineLegacy"] == 1 and result["counts"]["alreadyMigratedInline"] == 0
+
+
+def test_a_legacy_asset_that_only_mentions_the_marker_gets_an_entry(tmp_path):
+    write_scan(tmp_path, field("A", "viaAsset", f'#dotParse("/dA/{DA_ID}")'))
+    write_meta(tmp_path)
+    vm.cmd_classify(tmp_path)
+    vm.cmd_assets_plan(tmp_path)
+    download(tmp_path, text=LEGACY + "\n## isNewEditModeEnabled")
+    result = vm.cmd_build_manifest(tmp_path, None)
+    assert [e["key"] for e in result["entries"] if e["kind"] == "asset"] == [DA_ID]
+
+
+def test_an_asset_not_confirmed_by_this_run_is_not_treated_as_migrated(instance):
+    vm.cmd_record(instance, DA_ID, "published", None, "inode-2")
+    (instance / "assets" / f"{DA_ID}.json").unlink()  # this run cannot resolve it any more
+    vm.cmd_classify(instance)
+    vm.cmd_assets_plan(instance)
+    vm.cmd_build_manifest(instance, None)
+    manifest = vm.read_manifest(instance)
+    assert manifest["knownMigrated"] == {}
+    assert not [e for e in manifest["entries"] if e["kind"] == "renderMode" and e["key"] == "A.viaAsset"]
+
+
+def test_invalid_utf8_in_a_metadata_file_does_not_block_the_others(tmp_path):
+    write_scan(tmp_path, field("A", "one", '#dotParse("/dA/abc")'), field("A", "two", '#dotParse("/dA/def")'))
+    write_meta(tmp_path, "def")
+    (tmp_path / "assets").mkdir(exist_ok=True)
+    (tmp_path / "assets" / "abc.json").write_bytes(b"\xff\xfe{")
+    vm.cmd_classify(tmp_path)
+    plan = vm.cmd_assets_plan(tmp_path)
+    assert [d["id"] for d in plan["toDownload"]] == ["def"]
+    assert any("abc" in u for u in plan["unresolved"])
 
 
 def test_a_corrupt_asset_metadata_file_does_not_block_the_others(tmp_path):

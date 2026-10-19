@@ -77,15 +77,26 @@ def write_inside(root: Path, relative: str, data) -> None:
     if isinstance(data, bytes):
         target.write_bytes(data)
     else:
-        target.write_text(data)
+        write_text_verbatim(target, data)
+
+
+def read_text_verbatim(path: Path) -> str:
+    """Reads text without newline translation, so CRLF survives a comparison or a PUT body."""
+    with open(path, encoding="utf-8", newline="") as f:
+        return f.read()
+
+
+def write_text_verbatim(path: Path, data: str) -> None:
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(data)
 
 
 def read_json(path: Path):
     if not path.exists():
         raise InputError(f"missing {path}")
     try:
-        return json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError) as e:
+        return json.loads(read_text_verbatim(path))
+    except (ValueError, OSError) as e:  # ValueError covers JSONDecodeError and UnicodeDecodeError
         raise InputError(f"{path} is unreadable or corrupt: {e}") from e
 
 
@@ -94,7 +105,7 @@ def write_json(path: Path, data) -> None:
     file intact, never a truncated one."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2))
+    write_text_verbatim(tmp, json.dumps(data, indent=2))
     os.replace(tmp, path)
 
 
@@ -158,7 +169,7 @@ class Scan:
 
         if match := CORE_FILE_RE.search(values):
             self.core_files.append(f"{owner} -> {match.group(1)}")
-        elif MIGRATED_MARKER in values:
+        elif is_inline_migrated(values.encode("utf-8")):
             self.inline_migrated.append(owner)
         elif LEGACY_RE.search(values):
             safe_owner = sanitize_path_component(owner, fallback=f"field-{field['fieldId']}")
@@ -278,6 +289,7 @@ def cmd_assets_plan(workdir: Path) -> dict:
     known = known_migrated_inodes(try_read_previous_manifest(workdir))
 
     to_download, unresolved, pinned, already_migrated = [], [], [], []
+    already_migrated_ids: dict[str, str] = {}
     for da_id, owners in scan.asset_refs.items():
         used_by = ", ".join(owners)
         meta_path = workdir / "assets" / f"{da_id}.json"
@@ -300,6 +312,7 @@ def cmd_assets_plan(workdir: Path) -> dict:
         file_name = asset_file_name(meta)
         if known.get(da_id) == meta["inode"]:
             already_migrated.append(f"{meta.get('contentType')} {file_name or da_id} ({da_id})")
+            already_migrated_ids[da_id] = meta["inode"]
             continue
         if not file_name:
             unresolved.append(f"{da_id} (no fileName/name/title on this content item, used by {used_by})")
@@ -322,6 +335,8 @@ def cmd_assets_plan(workdir: Path) -> dict:
         "unresolved": unresolved,
         "pinned": pinned,
         "alreadyMigrated": already_migrated,
+        # id -> inode, established by this run's metadata; build-manifest trusts only these
+        "alreadyMigratedIds": already_migrated_ids,
     }
     write_json(workdir / "assets-plan.json", plan)
     return {"command": "assets-plan", **plan}
@@ -374,13 +389,16 @@ def render_mode_entries(scan: Scan, queued_assets: set[str], migrated_assets: se
 
 def carry_over_progress(entries: list[dict], previous: dict) -> None:
     """A rebuild must not undo work: copy status, reason and previousInode from the previous
-    manifest's entry with the same key and kind. An entry that no longer shows up (a field
-    already published is now classified as migrated) is simply dropped."""
+    manifest's entry with the same key and kind, unless an asset's inode changed since.
+    An entry that no longer shows up (a field already published is now classified as
+    migrated) is simply dropped."""
     earlier = {(e["kind"], e["key"]): e for e in previous.get("entries", [])}
     for entry in entries:
         old = earlier.get((entry["kind"], entry["key"]))
         if not old:
             continue
+        if entry["kind"] == "asset" and old.get("inode") != entry["inode"]:
+            continue  # a newer version of the asset: earlier progress belongs to another file
         entry["status"] = old.get("status", entry["status"])
         entry["statusReason"] = old.get("statusReason")
         if old.get("previousInode"):
@@ -392,14 +410,13 @@ def cmd_build_manifest(workdir: Path, instance: str | None) -> dict:
     scan = Scan.from_json(read_json(workdir / "scan-result.json"))
     plan = read_json(workdir / "assets-plan.json")
     previous = try_read_previous_manifest(workdir)
-    known = known_migrated_inodes(previous)
     original_dir = workdir / "original"
 
     entries: list[dict] = []
     unresolved = list(plan["unresolved"])
     already_migrated = list(plan["alreadyMigrated"])
     unpublished: list[str] = []
-    confirmed_migrated = {k: v for k, v in known.items() if k in scan.asset_refs}
+    confirmed_migrated = dict(plan.get("alreadyMigratedIds") or {})
 
     for item in plan["toDownload"]:
         da_id = item["id"]
@@ -413,7 +430,7 @@ def cmd_build_manifest(workdir: Path, instance: str | None) -> dict:
         if not downloaded.is_file():
             unresolved.append(f"{da_id} (download failed, used by {', '.join(item['usedBy'])})")
             continue
-        if MIGRATED_MARKER.encode() in downloaded.read_bytes():
+        if is_inline_migrated(downloaded.read_bytes()):
             already_migrated.append(label)
             confirmed_migrated[da_id] = meta["inode"]
             continue
@@ -555,7 +572,8 @@ def locate_top_level_else(migrated: bytes) -> tuple[int, int] | str:
     one reached while nothing opened after the header is still open, and the matching final
     `#end` closes the header's own `#if`. Returns (start, end) byte offsets spanning the
     legacy body (exclusive of the `#else`/`#end` directives), or a diagnostic string, never
-    raising, for a malformed shape."""
+    raising, for a malformed shape. Every directive after the outer `#end` is checked too: the
+    whole file must parse, so a second top-level `#else` or an unmatched `#end` is rejected."""
     header = _INLINE_HEADER_RE.match(migrated)
     if not header:
         return "migrated file does not start with #if( $structures.isNewEditModeEnabled() ) on line 1"
@@ -566,17 +584,32 @@ def locate_top_level_else(migrated: bytes) -> tuple[int, int] | str:
     for name, start, end in _iter_directives(migrated):
         if start < header.end():
             continue  # the header's own #if is not itself counted
+        if end_start is not None:
+            # trailing content: only balanced blocks may follow the outer #end
+            if name in _BLOCK_OPENERS or name == b"@":
+                depth += 1
+            elif name == b"end":
+                if depth == 0:
+                    return "unmatched #end after the end of the inline block"
+                depth -= 1
+            elif name in (b"else", b"elseif") and depth == 0:
+                return f"#{name.decode()} after the end of the inline block"
+            continue
         if name == b"end":
             if depth == 0:
                 end_start = start
-                break
+                continue
             depth -= 1
         elif name == b"else":
-            if depth == 0 and else_body_start is None:
+            if depth == 0:
+                if else_body_start is not None:
+                    return "more than one top-level #else in the inline block"
                 else_body_start = end
+        elif name == b"elseif":
+            if depth == 0 and else_body_start is not None:
+                return "#elseif after the top-level #else"
         elif name in _BLOCK_OPENERS or name == b"@":
             depth += 1
-        # 'elseif' never changes depth and is never treated as a branch start
 
     if else_body_start is None:
         return "no top-level #else branch found in migrated content (legacy code not located)"
@@ -585,16 +618,50 @@ def locate_top_level_else(migrated: bytes) -> tuple[int, int] | str:
             "no matching top-level #end found in migrated content "
             "(unbalanced #if/#foreach/#macro/#define/#literal/#@ block)"
         )
+    if depth != 0:
+        return "unbalanced #if/#foreach/#macro/#define/#literal/#@ block after the inline block"
     if end_start <= else_body_start:
         return "malformed structure: #end appears before the top-level #else"
     return (else_body_start, end_start)
 
 
+_MACRO_NAME_RE = re.compile(rb"\(\s*([A-Za-z_][A-Za-z0-9_\-]*)")
+
+
+def macro_names(data: bytes, lo: int, hi: int) -> set[bytes]:
+    """Names of the `#macro( name ...)` definitions that start between `lo` and `hi`."""
+    names = set()
+    for name, start, end in _iter_directives(data):
+        if name == b"macro" and lo <= start < hi and (m := _MACRO_NAME_RE.match(data, end)):
+            names.add(m.group(1))
+    return names
+
+
+def _strip_layout_newline(body: bytes) -> bytes:
+    """Drops the one newline the inline layout adds after `#else` and before `#end`."""
+    for nl in (b"\r\n", b"\n"):
+        if body.startswith(nl):
+            body = body[len(nl):]
+            break
+    for nl in (b"\r\n", b"\n"):
+        if body.endswith(nl):
+            return body[: -len(nl)]
+    return body
+
+
+def is_inline_migrated(data: bytes) -> bool:
+    """True when `data` is an inline migration: the edit-mode wrapper opens line 1 and closes
+    around a top-level `#else`. A legacy file that merely mentions `isNewEditModeEnabled` in a
+    comment, a string or unrelated JavaScript is not one."""
+    return not isinstance(locate_top_level_else(data.lstrip()), str)
+
+
 def inline_problem(original: bytes, migrated: bytes) -> str | None:
     """The inline output keeps the legacy code verbatim under #else, next to the new code
     under #if( $structures.isNewEditModeEnabled() ). Returns why `migrated` is not a valid
-    inline migration of `original`, or None. The original must be verbatim *inside the
-    located top-level #else branch*, not merely present anywhere in the file."""
+    inline migration of `original`, or None. The #else branch must equal the original
+    (minus the layout newlines), the #if branch must not carry legacy patterns, and the two
+    branches must not define the same #macro."""
     if MIGRATED_MARKER.encode() not in migrated:
         return f"no {MIGRATED_MARKER}() branch (three-file output or blocked migration?)"
 
@@ -603,8 +670,18 @@ def inline_problem(original: bytes, migrated: bytes) -> str | None:
         return located
 
     start, end = located
-    if original.strip() not in migrated[start:end]:
-        return "original code is not preserved verbatim in the #else branch"
+    if _strip_layout_newline(migrated[start:end]) != original:
+        return "the #else branch is not the original code verbatim"
+
+    header_end = _INLINE_HEADER_RE.match(migrated).end()
+    new_branch = migrated[header_end:start].decode("utf-8", errors="replace")
+    if match := LEGACY_RE.search(new_branch):
+        return f"the #if branch still has legacy code ({match.group(0).strip()!r}); migrate it or offer three files"
+
+    shared = macro_names(migrated, header_end, start) & macro_names(migrated, start, end)
+    if shared:
+        names = ", ".join(sorted(n.decode("utf-8", errors="replace") for n in shared))
+        return f"#macro defined in both branches ({names}): the first definition wins, so the legacy editor would run the new macro"
     return None
 
 
@@ -659,11 +736,11 @@ def cmd_field_body(workdir: Path, key: str, field_file: Path) -> dict:
         original = workdir / "original" / entry["file"]
         if not migrated.exists() or not original.exists():
             raise InputError(f"missing the original or migrated file for {entry['key']}")
-        if (field.get("values") or "") != original.read_text():
+        if (field.get("values") or "") != read_text_verbatim(original):
             return {"command": "field-body", "key": entry["key"], "verdict": "skipped",
                     "reason": "changed on the server since download"}
         updated = with_component_render_mode(field)
-        updated["values"] = migrated.read_text()
+        updated["values"] = read_text_verbatim(migrated)
     else:
         if has_component_render_mode(field):
             return {"command": "field-body", "key": entry["key"], "verdict": "skipped",

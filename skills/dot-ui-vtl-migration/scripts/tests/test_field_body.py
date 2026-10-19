@@ -101,3 +101,20 @@ def test_the_cli_prints_the_body(instance, capsys):
     path = write_field(instance)
     assert vm.main(["--workdir", str(instance), "field-body", "A.legacy", "--field-file", str(path)]) == 0
     assert json.loads(capsys.readouterr().out)["body"]["field"]["values"] == INLINE_MIGRATED
+
+
+def test_crlf_in_the_original_is_compared_and_kept_verbatim(tmp_path):
+    crlf = "<script>dojo.ready(function(){\r\n  dijit.byId('x');\r\n});</script>"
+    migrated = "#if( $structures.isNewEditModeEnabled() )\r\n<p>new</p>\r\n#else\r\n" + crlf + "\r\n#end"
+    write_scan(tmp_path, field("A", "legacy", crlf))
+    vm.cmd_classify(tmp_path)
+    vm.cmd_assets_plan(tmp_path)
+    vm.cmd_build_manifest(tmp_path, None)
+    (tmp_path / "migrated" / "fields").mkdir(parents=True)
+    vm.write_text_verbatim(tmp_path / "migrated" / "fields" / "A.legacy.vtl", migrated)
+    server = {"id": "f-legacy", "values": crlf, "fieldVariables": []}
+    field_file = tmp_path / "tmp.json"
+    field_file.write_text(json.dumps(server))
+    result = vm.cmd_field_body(tmp_path, "A.legacy", field_file)
+    assert result["verdict"] == "ok"
+    assert result["body"]["field"]["values"] == migrated

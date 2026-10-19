@@ -168,3 +168,60 @@ def test_end_date_selector_without_surrounding_block_is_recognized_as_a_real_dir
     # correctly does not consider the untruncated original verbatim-matched.
     problem = mcf.inline_problem(legacy, migrated)
     assert problem is not None
+
+
+HEADER = b"#if( $structures.isNewEditModeEnabled() )\n"
+
+
+def inline(new: bytes, original: bytes = ORIGINAL) -> bytes:
+    return HEADER + new + b"\n#else\n" + original + b"\n#end"
+
+
+def test_a_stray_end_after_the_inline_block_is_rejected():
+    problem = mcf.inline_problem(ORIGINAL, inline(b"<p>new</p>") + b"\n#end")
+    assert problem and "unmatched #end" in problem
+
+
+def test_a_stray_else_after_the_inline_block_is_rejected():
+    assert mcf.inline_problem(ORIGINAL, inline(b"<p>new</p>") + b"\n#else") is not None
+
+
+def test_balanced_blocks_after_the_inline_block_are_allowed():
+    assert mcf.inline_problem(ORIGINAL, inline(b"<p>new</p>") + b"\n#if( $x )a#end") is None
+
+
+def test_a_second_top_level_else_is_rejected():
+    migrated = HEADER + b"<p>new</p>\n#else\n" + ORIGINAL + b"\n#else\nmore\n#end"
+    assert "more than one top-level #else" in mcf.inline_problem(ORIGINAL, migrated)
+
+
+def test_extra_code_in_the_else_branch_is_rejected():
+    migrated = HEADER + b"<p>new</p>\n#else\nextra code\n" + ORIGINAL + b"\n#end"
+    assert "verbatim" in mcf.inline_problem(ORIGINAL, migrated)
+
+
+def test_the_else_branch_keeps_crlf_and_a_missing_final_newline():
+    original = b"line one\r\nline two dojo.ready(x)"
+    assert mcf.inline_problem(original, inline(b"<p>new</p>", original)) is None
+
+
+def test_legacy_copied_into_both_branches_is_rejected():
+    problem = mcf.inline_problem(ORIGINAL, inline(ORIGINAL))
+    assert problem and "#if branch still has legacy code" in problem
+
+
+def test_the_same_macro_in_both_branches_is_rejected():
+    original = b"#macro( show $x )old $x#end\n<p>legacy dojo.byId('a')</p>"
+    problem = mcf.inline_problem(original, inline(b"#macro( show $x )new $x#end", original))
+    assert problem and "show" in problem
+
+
+def test_different_macros_in_each_branch_are_allowed():
+    original = b"#macro( showOld $x )old $x#end\n<p>legacy</p>"
+    assert mcf.inline_problem(original, inline(b"#macro( showNew $x )new $x#end", original)) is None
+
+
+def test_is_inline_migrated_needs_the_real_wrapper_not_a_mention():
+    assert mcf.is_inline_migrated(inline(b"<p>new</p>"))
+    assert not mcf.is_inline_migrated(b"<script>// $structures.isNewEditModeEnabled()</script>")
+    assert not mcf.is_inline_migrated(b"")
