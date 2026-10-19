@@ -12,8 +12,9 @@ Cursor, Codex, and any [Agent Skills](https://agentskills.io)-compatible agent.
 |---|---|
 | **`dotcms-best-practices`** | Reference for doing any single thing correctly — create a content type, page, template or container; place content; author VTL; wire a headless Next.js frontend; or debug a page that renders blank. Indexed by intent, so the agent loads one file for the task at hand. |
 | **`dotcms-create-sites`** | Plans and builds a complete site in two phases: an interview that writes `PLAN.md` and `DESIGN.md`, then a build that hands off to `dotcms-best-practices` and holds a verify-and-fix loop until every page type renders. |
+| **`dot-ui-vtl-migration`** | Migrates legacy Dojo/Dijit custom field VTL to `DotCustomFieldApi` — one file at a time, or every legacy custom field on an instance through the MCP server plus a local validation script — keeping the original code as a fallback behind the edit-mode switch. |
 
-Both support **VTL-rendered** and **headless (Next.js)** delivery.
+`dotcms-best-practices` and `dotcms-create-sites` support **VTL-rendered** and **headless (Next.js)** delivery.
 
 > **Why a skill and not just docs:** in dotCMS a missing piece renders blank or shell-only with
 > **HTTP 200**, never an error. A successful response is not evidence that anything rendered. Every
@@ -27,7 +28,7 @@ Both support **VTL-rendered** and **headless (Next.js)** delivery.
 npx skills add dotCMS/agent-toolkit
 ```
 
-Installs both skills. Add `-g` for all projects, `--list` to preview without installing, or
+Installs all skills. Add `-g` for all projects, `--list` to preview without installing, or
 `--skill dotcms-best-practices` for just one.
 
 ### Plugin — Claude Code

@@ -40,3 +40,9 @@ jobs:
 
       - name: Agent Plugins manifests
         run: node scripts/validate-agent-plugin.mjs
+
+      # The migration skill's local helper has no network and no dependencies beyond pytest.
+      - name: Migration script tests
+        run: |
+          python3 -m pip install --quiet pytest==8.3.4
+          python3 -m pytest -q skills/dot-ui-vtl-migration/scripts/tests
