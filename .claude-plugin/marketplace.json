@@ -28,7 +28,7 @@
       "category": "development",
       "keywords": ["dotcms", "cms", "content-management", "vtl", "nextjs", "headless"],
       "tags": ["dotcms", "cms", "content-management", "vtl", "nextjs", "headless"],
-      "skills": ["./skills/dotcms-create-sites", "./skills/dotcms-best-practices"]
+      "skills": ["./skills/dotcms-create-sites", "./skills/dotcms-best-practices", "./skills/dot-ui-vtl-migration"]
     }
   ]
 }
