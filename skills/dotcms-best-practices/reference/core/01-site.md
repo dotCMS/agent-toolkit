@@ -9,11 +9,14 @@ You need a hostname before starting — from PLAN.md §2 if you came from `dotcm
 Look it up by hostname first so a re-run doesn't fail or duplicate:
 
 ```
-GET  /api/v1/site?perPage=100      → match entity[].hostname
+GET  /api/v1/site?per_page=100&archive=false   → match entity[].hostname
 POST /api/v1/site                  → { "siteName": "<hostname>", "description": "…", "languageId": 1 }
 ```
 
 The created site's `identifier` is what every later step means by "site id".
+
+- **`per_page`, not `perPage`.** dotCMS ignores `perPage` and returns its default page of 10 sites, so a lookup on a larger instance misses sites.
+- **`archive=false` includes unpublished sites.** Without it the listing skips them, so a re-run doesn't find the unpublished site it created the first time. (`archive=true` returns only archived sites.)
 
 ## Set aliases, then publish
 
@@ -53,4 +56,4 @@ PUT  /api/v1/assets/folders   → same body, for a folder that already exists
 
 ## Done when
 
-`GET /api/v1/site?perPage=100` shows the site with your hostname, its alias set, and `http://<alias>:8080/` returns something other than the default site, and every folder the menu needs has its title, Show on Menu and Sort Order set. Record the identifier — [02](02-content-types.md) onward all need it.
+`GET /api/v1/site?per_page=100&archive=false` shows the site with your hostname, its alias set, and `http://<alias>:8080/` returns something other than the default site, and every folder the menu needs has its title, Show on Menu and Sort Order set. Record the identifier — [02](02-content-types.md) onward all need it.
