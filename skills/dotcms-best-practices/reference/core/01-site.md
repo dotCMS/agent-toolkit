@@ -1,13 +1,8 @@
 # 01 · The site
 
-**First build step, both delivery modes.** Everything after this needs the site's
-identifier: content types scope content to it, assets upload into its folder tree,
-the template payload carries `siteId`, and pages are created under it. Create it
-before anything else.
+**First build step, both delivery modes.** Everything after this needs the site's identifier: content types scope content to it, assets upload into its folder tree, the template payload carries `siteId`, and pages are created under it. Create it before anything else.
 
-You need a hostname before starting — from PLAN.md §2 if you came from
-`dotcms-create-sites`, otherwise ask for it; never invent one. Sites have no purpose-built tool —
-go through the dotCMS MCP server.
+You need a hostname before starting — from PLAN.md §2 if you came from `dotcms-create-sites`, otherwise ask for it; never invent one. Sites have no purpose-built tool — go through the dotCMS MCP server.
 
 ## Create (or reuse) the site
 
@@ -22,8 +17,7 @@ The created site's `identifier` is what every later step means by "site id".
 
 ## Set aliases, then publish
 
-A new site is **unpublished** — it serves nothing until you publish it. Aliases are
-set with a separate `PUT`, which has two traps:
+A new site is **unpublished** — it serves nothing until you publish it. Aliases are set with a separate `PUT`, which has two traps:
 
 ```
 PUT /api/v1/site?id=<siteId>       → { "siteName": "<hostname>", "aliases": "<alias>", "forceExecution": true }
@@ -31,24 +25,32 @@ PUT /api/v1/site/<siteId>/_publish
 ```
 
 - **The id goes in the query string.** An `identifier` in the body is ignored.
-- **`siteName` is mandatory on the PUT** even when you are only changing aliases;
-  omit it and the call fails.
+- **`siteName` is mandatory on the PUT** even when you are only changing aliases; omit it and the call fails.
 - **`forceExecution: true`** is required for the change to apply.
 
 ## Give it a `*.localhost` alias for verification
 
-Verification requests resolve the site by **hostname**, and a fetch client cannot
-fake one: Node's `fetch` silently drops a `Host` header (the Fetch spec forbids it),
-so the request lands on the *default* site and every check 404s while the pages are
-actually fine.
+Verification requests resolve the site by **hostname**, and a fetch client cannot fake one: Node's `fetch` silently drops a `Host` header (the Fetch spec forbids it), so the request lands on the *default* site and every check 404s while the pages are actually fine.
 
-Set an alias ending in `.localhost` — e.g. `mysite.localhost` for the site
-`mysite.local`. Browsers and Node resolve `*.localhost` to `127.0.0.1` with no
-`/etc/hosts` entry, so `http://mysite.localhost:8080/` reaches the right site.
-Verify against the alias, not the canonical hostname.
+Set an alias ending in `.localhost` — e.g. `mysite.localhost` for the site `mysite.local`. Browsers and Node resolve `*.localhost` to `127.0.0.1` with no `/etc/hosts` entry, so `http://mysite.localhost:8080/` reaches the right site. Verify against the alias, not the canonical hostname.
+
+## Folders and the menu
+
+In a VTL site the header menu is usually built from folders: the nav tool lists a folder when its **Show on Menu** is on, orders folders by **Sort Order** and labels each with its **Title**. A folder created with default settings has none of these, so the menu renders empty and the page still returns HTTP 200.
+
+Create folders with their menu settings in one call, or fix folders that exist, with the assets endpoint:
+
+```
+POST /api/v1/assets/folders   → { "assetPath": "//<hostname>/offers/", "data": { "title": "Offers", "showOnMenu": true, "sortOrder": 1 } }
+PUT  /api/v1/assets/folders   → same body, for a folder that already exists
+```
+
+- **Use `/api/v1/assets/folders` for menu folders.** `POST /api/v1/folder/createfolders/{siteName}` creates folders with default settings only, and `/api/v1/folder` has no update.
+- **It may not show up when you search the API spec.** Call it directly with the execute tool.
+- **`assetPath` is host-qualified and ends with `/`.**
+- **Copying an existing site?** Read each source folder's `title`, `showOnMenu` and `sortOrder` with `GET /api/v1/folder/siteId/<siteId>/path/<path>` and write the same values.
+- **Folder titles have no language.** The title is the same in every language; a translated menu label has to come from the theme or from a page title.
 
 ## Done when
 
-`GET /api/v1/site?perPage=100` shows the site with your hostname, its alias set, and
-`http://<alias>:8080/` returns something other than the default site. Record the
-identifier — [02](02-content-types.md) onward all need it.
+`GET /api/v1/site?perPage=100` shows the site with your hostname, its alias set, and `http://<alias>:8080/` returns something other than the default site, and every folder the menu needs has its title, Show on Menu and Sort Order set. Record the identifier — [02](02-content-types.md) onward all need it.
