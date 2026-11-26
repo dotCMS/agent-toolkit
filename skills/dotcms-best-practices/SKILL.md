@@ -128,7 +128,7 @@ don't rule it out on that basis.
 
 | Check | Why |
 |---|---|
-| **Menu is empty** | Folders created with default settings aren't on the menu: Show on Menu off, no title, sort order 0 — [core/01-site.md](reference/core/01-site.md) |
+| **Menu is empty** | The Navigation API (`$navtool`, `GET /api/v1/nav`) skips folders created with default settings: Show on Menu off, no title, sort order 0 — [core/01-site.md](reference/core/01-site.md) |
 | **Language / locale** | Content saved under one language and requested under another can render blank. This skill doesn't document dotCMS's resolution behavior — **fetch it and verify** |
 | **Page cache** | A stale cached page serves old output; page verification reports this as a cache verdict — [vtl/05](reference/vtl/05-verify-and-debug.md) |
 | **Verify properly** | VTL: [vtl/05](reference/vtl/05-verify-and-debug.md) — note `/api/vtl/dynamic` runs outside a request context and cannot see `$CONTENTLETS`, `$dotContentMap`, `$URLMapContent` or `$dotTheme`, so it validates only the parts that don't matter for a container. Headless: [nextjs/05](reference/nextjs/05-verify.md) — page verification does **not** apply |

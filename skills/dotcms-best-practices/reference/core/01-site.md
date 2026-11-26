@@ -39,21 +39,31 @@ Set an alias ending in `.localhost` — e.g. `mysite.localhost` for the site `my
 
 ## Folders and the menu
 
-In a VTL site the header menu is usually built from folders: the nav tool lists a folder when its **Show on Menu** is on, orders folders by **Sort Order** and labels each with its **Title**. A folder created with default settings has none of these, so the menu renders empty and the page still returns HTTP 200.
+The menu comes from the Navigation API: `$navtool.getNav()` in VTL, `GET /api/v1/nav/<path>` over REST. It lists the folders and pages under a path that have **Show on Menu** on, ordered by **Sort Order** and labelled with their **Title**. A folder created with default settings has none of these, so it is left out, the menu renders empty, and the page still returns HTTP 200.
 
-Create folders with their menu settings in one call, or fix folders that exist, with the assets endpoint:
+Read a menu, the model site's or your own, with the Navigation API:
+
+```
+GET /api/v1/nav/?depth=2&host_id=<siteId>   → entity.children[]: title, order, href
+```
+
+- **`depth=2`.** `depth=1` returns only the starting folder, with no children.
+- **`host_id`.** Without it the API resolves the request's site and returns the System folder.
+- **It works on unpublished sites,** so you can check a new site's menu before anything is published.
+
+The Navigation API is read only. To put a folder on the menu, set its title, Show on Menu and Sort Order when you create it, or fix an existing folder, with the assets endpoint:
 
 ```
 POST /api/v1/assets/folders   → { "assetPath": "//<hostname>/offers/", "data": { "title": "Offers", "showOnMenu": true, "sortOrder": 1 } }
 PUT  /api/v1/assets/folders   → same body, for a folder that already exists
 ```
 
-- **Use `/api/v1/assets/folders` for menu folders.** `POST /api/v1/folder/createfolders/{siteName}` creates folders with default settings only, and `/api/v1/folder` has no update.
+- **`POST /api/v1/folder/createfolders/{siteName}` creates folders with default settings only,** and `/api/v1/folder` has no update.
 - **It may not show up when you search the API spec.** Call it directly with the execute tool.
 - **`assetPath` is host-qualified and ends with `/`.**
-- **Copying an existing site?** Read each source folder's `title`, `showOnMenu` and `sortOrder` with `GET /api/v1/folder/siteId/<siteId>/path/<path>` and write the same values.
+- **Copying an existing site?** Read its menu with the Navigation API and create the same folders with the same title and order.
 - **Folder titles have no language.** The title is the same in every language; a translated menu label has to come from the theme or from a page title.
 
 ## Done when
 
-`GET /api/v1/site?per_page=100&archive=false` shows the site with your hostname, its alias set, and `http://<alias>:8080/` returns something other than the default site, and every folder the menu needs has its title, Show on Menu and Sort Order set. Record the identifier — [02](02-content-types.md) onward all need it.
+`GET /api/v1/site?per_page=100&archive=false` shows the site with your hostname, its alias set, and `http://<alias>:8080/` returns something other than the default site, and `GET /api/v1/nav/?depth=2&host_id=<siteId>` lists the menu you expect, in order. Record the identifier — [02](02-content-types.md) onward all need it.
